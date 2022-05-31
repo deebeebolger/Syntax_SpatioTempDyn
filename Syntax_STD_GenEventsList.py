@@ -1,5 +1,7 @@
 # SCRIPT TO GENERATE EVENT LISTS FOR EXPERIMENTAL PROTOCOL.
 """
+    Programmed by: Deirdre BOLGER
+    Date: May 2022
     The events lists must adhere to the following rules:
     - No adjacent fillers
     - No stimuli with the same keyword less than 5 trials apart.
