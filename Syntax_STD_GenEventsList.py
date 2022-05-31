@@ -15,7 +15,7 @@ import time
 import openpyxl
 from array import array
 
-fname = 'experimental_lists_Bissera.xlsx'
+fname = 'Experimental_Lists_Bissera1.xlsx'
 xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'
 dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
 trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
@@ -23,9 +23,9 @@ trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
 ## Read content from dataIn dataframe
 Keywords = dataIn["keyword"].tolist()
 Stims = dataIn["stim"].tolist()
-newID = dataIn["newID"].tolist()
+newID = dataIn["newID?"].tolist()
 isfiller = dataIn["filler?"].tolist()
-pictypes = dataIn["imagetitle"].tolist()
+pictypes = dataIn["noun"].tolist()
 trigcodes = trigsIn["triggerCode"].tolist()
 
 Keywords_indx = list(np.arange(0, len(Keywords)))
