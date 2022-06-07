@@ -6,6 +6,13 @@
     - No adjacent fillers
     - No stimuli with the same keyword less than 5 trials apart.
     For each participant, there are two blocks (144*2 trials)
+    - The fillers are assigned such that on one presentation they correspond to the audio
+    stimulation and on a second presentation they do not.
+    Requires: the xlsx file "Experimental_Lists_Bissera1.xlsx"
+    Output:
+    The script outputs two excel files:
+    - An excel file (xlsx) with events ordered according to above rules.
+    - An excel file (xlsx) with Eprime structure to be imported into Eprime script.
 
 """
 
@@ -15,8 +22,11 @@ import time
 import openpyxl
 from array import array
 
+# Define filenames and paths
 fname = 'Experimental_Lists_Bissera1.xlsx'
-xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'
+xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'  # Path in which to save output xlsx files and from which to load fname.
+savefname = 'SubTest002_StimList.xlsx'                                     # Name of xlsx file in which to save the events list.
+
 dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
 trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
 
@@ -256,7 +266,7 @@ while tester == 0:
 
 
 ###----------------------Write the Dataframe to an Excel file-------------------------------------------------------####
-savefname = 'SubTest007_StimList.xlsx'   # Change to whatever naming system you want.
+
 with pd.ExcelWriter(xls_path + savefname) as writer:
     DExcelv2.to_excel(writer, sheet_name='sheet1')
 
@@ -267,3 +277,61 @@ for wcnt in range(0, len(wordsel)):
     wdiff = Windices[1] - Windices[0]
     print("Inter-keyword interval for current word %s is %d" % (wordsel[wcnt], wdiff))
     AllKeywords_intval.append(wdiff)
+
+
+###-------------------Restructure the Dataframe to Eprime format and save to Excel file-----------------------------####
+# The Excel file should have the following headers: ID; Weight (1); Nested; Procedure (trialProc); Audio; picture;
+# triggerAudio; triggerFixation
+
+# Prepare the audio column. It needs to show path and .*wav extension.
+allfillers    = DExcelv2['Filler?'].tolist()
+fillindex1    = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers[fillindx1] == 1]   # Find the indiices of the fillers
+audioID = DExcelv2['FillID']
+audio   = 'a/'+audioID+'.wav'
+for acnt in range(0, len(fillindex1)):
+    audio[fillindex1[acnt]] = 'a/'+audioID[fillindex1[acnt]]+'_F.wav'
+
+# Prepare the ID column.
+IDcol = np.linspace(1,len(audio), len(audio))
+
+# Prepare the Weight column.
+Weightcol = np.ones(len(audio), dtype=int)
+
+# Prepare the Procedure column.
+P = 'trialProc'
+Proccol = np.repeat(P, len(audio))
+
+# Prepare the Picture column
+imtype = DExcelv2['ImageType'].tolist()
+qmark  = '?'
+piccol = np.repeat(qmark, len(audio)).T.tolist()
+for pcnt in range(0, len(fillindex1)):
+    piccol[fillindex1[pcnt]] = 'pictures/'+imtype[fillindex1[pcnt]]+'.png'
+
+# To prepare the "correct" column test if "ImageType" is in "Stims":
+# If yes ==> correct (Y), if no ==> incorrect (N).
+stimtype = DExcelv2['Stims'].tolist()
+corrcol = np.repeat(qmark, len(audio)).T.tolist()
+for corrcnt in range(0, len(fillindex1)):
+    if imtype[fillindex1[corrcnt]] in stimtype[fillindex1[corrcnt]]:
+        print('Correct!')
+        corrcol[fillindex1[corrcnt]] = 'Y'
+    else:
+        print('Incorrect')
+        corrcol[fillindex1[corrcnt]] = 'N'
+
+TriggerCol = DExcelv2['Triggers']
+trigfixCol = np.ones(len(audio), dtype=int)
+nestedCol = np.repeat('', len(audio)).tolist()
+
+
+# Create a dataframe to write to Eprime.
+Deprime = pd.DataFrame(
+    [IDcol.T.tolist(), Weightcol.T.tolist(), nestedCol, Proccol.T.tolist(), audio.T.tolist(), piccol, corrcol, TriggerCol.T.tolist(), trigfixCol.T.tolist()],
+    index=['ID', 'Weight', 'Nested', 'Procedure', 'Audio', 'picture', 'correct', 'triggerAudio', 'triggerFixation'])
+Deprime = Deprime.T   # Transpose of the dataframe
+savefname1 = savefname[:-5]  +'_eprime.xlsx' # Change to whatever naming system you want.
+with pd.ExcelWriter(xls_path + savefname1) as writer:
+    Deprime.to_excel(writer, sheet_name='sheet1')
+
+
