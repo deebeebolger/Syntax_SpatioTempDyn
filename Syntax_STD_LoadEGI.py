@@ -1,7 +1,7 @@
 import mne
 
 fpath = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/Data/'
-datacurr = '120_20220520_052757.mff'
+datacurr = '013_20220608_030949.mff'
 fullpath = fpath + datacurr
 
 RawIn = mne.io.read_raw_egi(fullpath, channel_naming='E%d', verbose=None)   # Do not need to specify the

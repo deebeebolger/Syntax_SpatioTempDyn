@@ -28,7 +28,8 @@ from array import array
 # Define filenames and paths
 fname = 'Experimental_Lists_Bissera1.xlsx'
 xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'  # Path in which to save output xlsx files and from which to load fname.
-savefname = 'SubTest002_StimList.xlsx'                                     # Name of xlsx file in which to save the events list.
+savefname = 'SubTest002_StimList.xlsx'                                     # Name of xlsx file in which to save the events list. The eprime excel file name will be generated from this.
+
 
 dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
 trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
@@ -327,14 +328,21 @@ TriggerCol = DExcelv2['Triggers']
 trigfixCol = np.ones(len(audio), dtype=int)
 nestedCol = np.repeat('', len(audio)).tolist()
 
+# Add in a  trialProc to breakProc on sample 48+1 and 96+1...
+
 
 # Create a dataframe to write to Eprime.
 Deprime = pd.DataFrame(
     [IDcol.T.tolist(), Weightcol.T.tolist(), nestedCol, Proccol.T.tolist(), audio.T.tolist(), piccol, corrcol, TriggerCol.T.tolist(), trigfixCol.T.tolist()],
     index=['ID', 'Weight', 'Nested', 'Procedure', 'Audio', 'picture', 'correct', 'triggerAudio', 'triggerFixation'])
 Deprime = Deprime.T   # Transpose of the dataframe
+Deprime.loc[48.5] = [49, 1, '?', 'breakProc', '?', '?', '?', '?', '?']
+Deprime.loc[96.5] = [97, 1, '?', 'breakProc', '?', '?', '?', '?', '?']
+Deprime = Deprime.sort_index().reset_index(drop=True)
+IDcol2 = np.linspace(1,len(audio)+2, len(audio)+2)
+IDcol2 = IDcol2.T
+Deprime['ID'] = IDcol2
+
 savefname1 = savefname[:-5]  +'_eprime.xlsx' # Change to whatever naming system you want.
 with pd.ExcelWriter(xls_path + savefname1) as writer:
     Deprime.to_excel(writer, sheet_name='sheet1')
-
-
