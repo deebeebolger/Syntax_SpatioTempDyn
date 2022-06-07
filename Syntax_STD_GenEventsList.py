@@ -14,6 +14,9 @@
     - An excel file (xlsx) with events ordered according to above rules.
     - An excel file (xlsx) with Eprime structure to be imported into Eprime script.
 
+    Important: sometimes the script will not manage to converge on the correct organisation of events and will continue to search
+    and search. In this case, just stop the script running and try to run it again. Around 99% of the time it works.
+
 """
 
 import pandas as pd
