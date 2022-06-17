@@ -271,8 +271,8 @@ while tester == 0:
 
 ###----------------------Write the Dataframe to an Excel file-------------------------------------------------------####
 
-with pd.ExcelWriter(xls_path + savefname) as writer:
-    DExcelv2.to_excel(writer, sheet_name='sheet1')
+#with pd.ExcelWriter(xls_path + savefname) as writer:
+#    DExcelv2.to_excel(writer, sheet_name='sheet1')
 
 ### Resume the inter-keyword interval by extracting the indices of occurrence of each keyword.###
 AllKeywords_intval = []
