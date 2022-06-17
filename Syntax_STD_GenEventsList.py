@@ -344,4 +344,4 @@ Deprime['ID'] = IDcol2
 
 savefname1 = savefname[:-5]  +'_eprime.xlsx' # Change to whatever naming system you want.
 with pd.ExcelWriter(xls_path + savefname1) as writer:
-    Deprime.to_excel(writer, sheet_name='sheet1')
+    Deprime.to_excel(writer, sheet_name='sheet1', index=False)
