@@ -11,7 +11,7 @@
     Requires: the xlsx file "Experimental_Lists_Bissera1.xlsx"
     Output:
     The script outputs two excel files:
-    - An excel file (xlsx) with events ordered according to above rules.
+    - An excel file (xlsx) with events ordered according to above rules. But this has been commented out.
     - An excel file (xlsx) with Eprime structure to be imported into Eprime script.
 
     Important: sometimes the script will not manage to converge on the correct organisation of events and will continue to search
