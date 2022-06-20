@@ -35,11 +35,12 @@ dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
 trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
 
 ## Read content from dataIn dataframe
-Keywords = dataIn["keyword"].tolist()
-Stims = dataIn["stim"].tolist()
-newID = dataIn["newID?"].tolist()
-isfiller = dataIn["filler?"].tolist()
-pictypes = dataIn["noun"].tolist()
+Keywords  = dataIn["keyword"].tolist()
+Stims     = dataIn["stim"].tolist()
+newID     = dataIn["newID?"].tolist()
+ID        = dataIn["ID"].tolist()
+isfiller  = dataIn["filler?"].tolist()
+pictypes  = dataIn["noun"].tolist()
 trigcodes = trigsIn["triggerCode"].tolist()
 
 Keywords_indx = list(np.arange(0, len(Keywords)))
@@ -51,6 +52,7 @@ TrigAll = []
 ImageType = []
 StimType = []
 FillID = []
+FillID2 = []
 
 Wsel = []
 WIndxsel = []
@@ -59,7 +61,7 @@ AllTrigs = []
 AllImages = []
 AllStims = []
 AllFillID = []
-
+AllID = []
 
 def findElements(lst1, lst2):
     return [lst1[i] for i in lst2]
@@ -79,6 +81,7 @@ for counter in range(0, len(Keywords)):
         imageOrd = findElements(pictypes, randindx)
         stimOrd = findElements(Stims, randindx)
         fillIDord = findElements(newID, randindx)
+        fIDord2 = findElements(ID, randindx)
 
         if counter > 0:
             isfill_pre = IsFill[counter - 1]
@@ -113,6 +116,7 @@ for counter in range(0, len(Keywords)):
     ImageType.append(imageOrd)
     StimType.append(stimOrd)
     FillID.append(fillIDord)
+    FillID2.append(fIDord2)
 
     Wsel = np.append(Wsel, currsel)
     WIndxsel = np.append(WIndxsel, randindx)
@@ -121,15 +125,16 @@ for counter in range(0, len(Keywords)):
     AllImages = np.append(AllImages, imageOrd)
     AllStims = np.append(AllStims, stimOrd)
     AllFillID = np.append(AllFillID, fillIDord)
+    AllID = np.append(AllID, fIDord2)
 
     tester = 0
     print(wordsel)
 
 ## ------------------------ Write the events list to a dataframe-----------------------------------------------------###
 D = pd.DataFrame(
-    [Wsel.tolist(), AllTrigs.tolist(), IsFiller.tolist(), AllStims.tolist(), AllImages.tolist(), AllFillID.tolist()],
+    [Wsel.tolist(), AllTrigs.tolist(), IsFiller.tolist(), AllStims.tolist(), AllImages.tolist(), AllFillID.tolist(), AllID.tolist()],
     index=['Keywords', 'Triggers',
-           'Filler?', 'Stims', 'ImageType', 'FillID'])
+           'Filler?', 'Stims', 'ImageType', 'FillID', 'FID2'])
 Data2Excel = D.transpose()
 
 ## ---------Search for consecutive fillers (there appears to always be one consecutive filler occurrence)------------###
@@ -271,8 +276,8 @@ while tester == 0:
 
 ###----------------------Write the Dataframe to an Excel file-------------------------------------------------------####
 
-#with pd.ExcelWriter(xls_path + savefname) as writer:
-#    DExcelv2.to_excel(writer, sheet_name='sheet1')
+with pd.ExcelWriter(xls_path + savefname) as writer:
+    DExcelv2.to_excel(writer, sheet_name='sheet1')
 
 ### Resume the inter-keyword interval by extracting the indices of occurrence of each keyword.###
 AllKeywords_intval = []
@@ -293,7 +298,11 @@ fillindex1    = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers
 audioID = DExcelv2['FillID']
 audio   = 'a/'+audioID+'.wav'
 for acnt in range(0, len(fillindex1)):
-    audio[fillindex1[acnt]] = 'a/'+audioID[fillindex1[acnt]]+'_F.wav'
+    # Look for matching string in ID list and assign this to the current filler trial.
+    for i, s in enumerate(pictypes):
+        if s in audio[fillindex1[acnt]]:
+            print(i)
+            audio[fillindex1[acnt]] = 'a/'+ ID[i]+'.wav'
 
 # Prepare the ID column.
 IDcol = np.linspace(1,len(audio), len(audio))
@@ -302,8 +311,11 @@ IDcol = np.linspace(1,len(audio), len(audio))
 Weightcol = np.ones(len(audio), dtype=int)
 
 # Prepare the Procedure column.
-P = 'trialProc'
+P = 'fillerProc'
 Proccol = np.repeat(P, len(audio))
+not_fillindex1 = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers[fillindx1] == 0]
+for pccnt in range(0, len(not_fillindex1)):
+    Proccol[not_fillindex1[pccnt]] = 'trialProc'
 
 # Prepare the Picture column
 imtype = DExcelv2['ImageType'].tolist()
@@ -335,8 +347,8 @@ Deprime = pd.DataFrame(
 Deprime = Deprime.T   # Transpose of the dataframe
 
 # Add in a  trialProc to breakProc on sample 48+1 and 96+1...
-Deprime.loc[48.5] = [49, 1, '?', 'breakProc', '?', '?', '?', '?', '?']
-Deprime.loc[96.5] = [97, 1, '?', 'breakProc', '?', '?', '?', '?', '?']
+Deprime.loc[48.5] = [49, 1, '?', 'breakProc', '?', '?', '?', '200', '?']
+Deprime.loc[96.5] = [97, 1, '?', 'breakProc', '?', '?', '?', '200', '?']
 Deprime = Deprime.sort_index().reset_index(drop=True)
 IDcol2 = np.linspace(1,len(audio)+2, len(audio)+2)
 IDcol2 = IDcol2.T
