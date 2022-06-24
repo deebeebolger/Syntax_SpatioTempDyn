@@ -1,7 +1,7 @@
 # SCRIPT TO GENERATE EVENT LISTS FOR EXPERIMENTAL PROTOCOL.
 """
     Programmed by: Deirdre BOLGER
-    Date: May 2022
+    Date: May 2022 (updated June 2022)
     The events lists must adhere to the following rules:
     - No adjacent fillers
     - No stimuli with the same keyword less than 5 trials apart.
@@ -10,8 +10,7 @@
     stimulation and on a second presentation they do not.
     Requires: the xlsx file "Experimental_Lists_Bissera1.xlsx"
     Output:
-    The script outputs two excel files:
-    - An excel file (xlsx) with events ordered according to above rules. But this has been commented out.
+    The script outputs one excel files:
     - An excel file (xlsx) with Eprime structure to be imported into Eprime script.
 
     Important: sometimes the script will not manage to converge on the correct organisation of events and will continue to search
@@ -27,7 +26,7 @@ from array import array
 
 # Define filenames and paths
 fname = 'Experimental_Lists_Bissera1.xlsx'
-xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'  # Path in which to save output xlsx files and from which to load fname.
+xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'   # Path in which to save output xlsx files and from which to load fname.
 savefname = 'Pilot0099_EventsList.xlsx'                                     # Name of xlsx file in which to save the events list. The eprime excel file name will be generated from this.
 
 #dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
@@ -42,6 +41,9 @@ stims_sent = trigsIn["stim"].tolist()   # the auditory phrase presented
 trigcodes  = trigsIn["triggerCode"].tolist()
 
 StimID_indx = list(np.arange(0, len(StimID)))
+iwitch = [iw for iw in range(0, len(nouns)) if nouns[iw]=='sorcière']
+for iwnt in iwitch:
+    nouns[iwnt] = 'sorciere'
 
 # Initialise lists
 Rindx = []
@@ -139,15 +141,6 @@ D = pd.DataFrame(
            'Filler?', 'StimAudio', 'Picture', 'StimulusPhrase', 'RandIndx'])
 Data2Excel = D.transpose()
 
-## ---------Search for consecutive fillers (there appears to always be one consecutive filler occurrence)------------###
-searchval = [3, 3]
-X = (IsFiller[:-1] == searchval[0]) & (IsFiller[1:] == searchval[1])
-Xfind    = np.where(X)
-if len(Xfind) == 0:
-    print('No consecutive fillers found!')
-else:
-    print('Consecutive fillers found!')
-
 ###------Shift the fillers (Pictures column) so that on one occurrence they correspond to auditory stimulation and on second occurrence they
 ## do not correspond to the auditory stimulation (Stims column)---------###
 ## ONLY NEED TO CHANGE THE PICTURE COLUMN
@@ -158,11 +151,6 @@ IsFill = DExcelv2.loc[:, 'Filler?']
 IsFill = IsFill.to_list()
 fillindx = [index1 for index1 in range(len(IsFill)) if IsFill[index1] == 3]  # But need to leave out the current fillers.
 fill_items = [pics_list[i] for i in fillindx]
-
-# Correct the sorciere word.
-iwitch = [iw for iw in range(0, len(fill_items)) if fill_items[iw] =='sorcière']
-for iw in iwitch:
-    fill_items[iw] = 'sorciere'
 
 fillitems_u = np.unique(fill_items)
 fillitems_u = fillitems_u.tolist()
@@ -197,12 +185,6 @@ while tester == 0:
 
     Fill1_imaget = Itemp1.loc[fillpair_rand[0], 'Picture']   # Image type
     Fill2_imaget = Itemp2.loc[fillrand_idx[0], 'Picture']     # Image type
-
-    if Fill1_imaget == 'sorcière':
-        Fill1_imaget = 'sorciere'
-
-    if Fill2_imaget == 'sorcière':
-        Fill2_imaget = 'sorciere'
 
     DExcelv2.loc[fillpair_rand[0], 'Picture'] = Fill2_imaget
     DExcelv2.loc[fillrand_idx, 'Picture'] = Fill1_imaget
