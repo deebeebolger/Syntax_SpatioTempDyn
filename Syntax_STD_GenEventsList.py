@@ -28,7 +28,7 @@ from array import array
 # Define filenames and paths
 fname = 'Experimental_Lists_Bissera1.xlsx'
 xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'  # Path in which to save output xlsx files and from which to load fname.
-savefname = 'Pilot003_EventsList.xlsx'                                     # Name of xlsx file in which to save the events list. The eprime excel file name will be generated from this.
+savefname = 'Pilot0099_EventsList.xlsx'                                     # Name of xlsx file in which to save the events list. The eprime excel file name will be generated from this.
 
 #dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
 trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
@@ -69,18 +69,38 @@ AllStims = []
 AllFillID = []
 AllID = []
 
-def findElements(lst1, lst2):
-    return [lst1[i] for i in lst2]
+#def findElements(lst1, lst2):
+#    return [lst1[i] for i in lst2]
+
+def test_keywords(Allkeywords, CurrKeywords, cntr, test1):
+    if CurrKeywords in Allkeywords:
+        print('Looking for neighbouring keywords')
+        x = Allkeywords.index(keywordsel)
+
+        if (cntr - x) < 5:
+            print('Oh no! The same keyword appeared in the 5 find elements of list!')
+            test2 = 0
+        else:
+            print('Phew! No sign of this keyword in the last 5 find elements of list!')
+            test2 = 1
+
+        test = test1 * test2
+    else:
+        test = test1
+    return test
+
+
 
 tester = 0
-
 for counter in range(0, len(StimID)):
 
     print(counter)
     while tester == 0:
+
         currsel = []
-        np.random.seed(int(time.time()))
-        randindx = np.random.choice(StimID_indx, 1, replace=False)  # Returns random indices
+        p = np.ones(len(StimID_indx), dtype=int)
+        p = p/len(StimID_indx)
+        randindx = np.random.choice(StimID_indx, 1, replace=False, p = p)  # Returns random indices
         currsel  = StimID_indx.index(randindx[0])             # Find the word index corresponding to current random selection
         audstim  = StimID[currsel]                       # Find the currently selected audio stimulus.
         condsel  = Conds[currsel]                   # Find the currently selected filler type (0 or 1)
@@ -95,24 +115,14 @@ for counter in range(0, len(StimID)):
             if condsel == 3 and isfill_pre == 3:
                 print('consecutive fillers')
                 tester1 = 0
+
+                tester = test_keywords(KeyWord_sel, keywordsel, counter, tester1)
+
             else:
                 print('phew! No consecutive fillers')
                 tester1 = 1
+                tester = test_keywords(KeyWord_sel, keywordsel, counter, tester1)
 
-            # Need to find the last occurrence of the currsel
-            if keywordsel[0] in KeyWord_sel:
-                x = Keywords.index(keywordsel[0])
-
-                if (counter - x) < 5:
-                    print('Oh no! The same keyword appeared in the 5 find elements of list!')
-                    tester2 = 0
-                else:
-                    print('Phew! No sign of this keyword in the last 5 find elements of list!')
-                    tester2 = 1
-
-                tester = tester1 * tester2
-            else:
-                tester = tester1
         else:
 
             tester += 1
@@ -149,84 +159,23 @@ searchval = [3, 3]
 X = (IsFiller[:-1] == searchval[0]) & (IsFiller[1:] == searchval[1])
 Xfind    = np.where(X)
 
-# allindx  = list(range(len(Data2Excel)))
-#
-# ## Swap with another entry if consecutive fillers have been found.
-# # Find the indices of the other non-repeated elements.
-# DExcelv2 = Data2Excel.copy()
-# allpos = []
-# newpos = []
-#
-# for counter2 in range(0, len(Xfind[0])):
-#
-#     np.random.seed(int(time.time()))                      # Set the random generator seed.
-#     poscurr = [Xfind[0][counter2], Xfind[0][counter2]+1]  # Just need to move the first one
-#     allpos.extend(poscurr)
-#     notrep   = [v for i, v in enumerate(allindx) if i not in allpos]
-#     tester1  = 0
-#
-#
-#     while tester1 == 0:
-#
-#         alltests = []
-#
-#         randfill = np.random.choice(notrep, 1, replace=False)         # Returns random indices
-#         print(randfill)
-#
-#         # Check the random position does not have an adjacent filler
-#         # Check that it is not a filler position
-#         # Check that filler word does not appear in the 5 entries before or after this random position
-#         fillcurr = Data2Excel.loc[poscurr[0], 'ImageType']     # The first index of the repeated filler
-#         wordcurr = Data2Excel.loc[randfill[0], 'ImageType']    # The ImageType corresponding to corresponding to possible new position for poscurr
-#         isfill   = Data2Excel.loc[randfill[0], 'Filler?']      # Need to make sure that the new position is not a filler position.rand
-#         isfillpre = Data2Excel.loc[randfill[0]-1, 'Filler?']
-#         isfillpost = Data2Excel.loc[randfill[0]+1, 'Filler?']
-#
-#         imageall = Data2Excel.loc[:, 'ImageType']
-#         fillindx = [idx1 for idx1 in range(len(imageall)) if imageall[idx1] == fillcurr]   # Find indices of occurrences of current filler
-#         wordindx = [idx2 for idx2 in range(len(imageall)) if imageall[idx2] == wordcurr]   # Find indices of occurrences of swap word.
-#
-#         fdiff = np.abs(randfill - fillindx)    # Ensure that same filler word is more than 5 words apart from current filler.
-#         wdiff = np.abs(poscurr[0] - wordindx)  # Ensure that the same word is more than 5 words apart in the new position
-#
-#         word_test  = wordcurr != fillcurr
-#         fill_test  = isfill == 0
-#         fill_pretest = isfillpre == 0
-#         fill_postest = isfillpost == 0
-#         alltests = word_test + fill_test + fill_pretest + fill_postest
-#
-#         A = fdiff > 5
-#         A1 = wdiff > 5
-#         filldist1 = A.all()
-#         wordist1  = A1.all()
-#
-#         if alltests == 4 and filldist1 and wordist1:
-#             print('A good candidate position')
-#             tester1 = 1
-#
-#         elif alltests > 4 or not fill_test or not filldist1 or not wordist1:
-#             print('Oh no, not a good candidate position...try again!')
-#             tester1 = 0
-#
-#     print(randfill)
-#     allpos.extend(randfill)
-#
-#     temp  = DExcelv2.iloc[poscurr[0]].copy()
-#     temp2 = DExcelv2.iloc[randfill].copy()
-#     DExcelv2.iloc[randfill] = temp
-#     DExcelv2.iloc[poscurr[0]] = temp2
-#     randfill = []
 
-
-###------Shift the fillers (Imagetype column) so that on one occurrence they correspond to auditory stimulation and on second occurrence they
+###------Shift the fillers (Pictures column) so that on one occurrence they correspond to auditory stimulation and on second occurrence they
 ## do not correspond to the auditory stimulation (Stims column)---------###
 ## ONLY NEED TO CHANGE THE PICTURE COLUMN
 
-images_list = DExcelv2['ImageType'].tolist()
+DExcelv2 = Data2Excel
+pics_list = DExcelv2['Picture'].tolist()
 IsFill = DExcelv2.loc[:, 'Filler?']
 IsFill = IsFill.to_list()
-fillindx = [index1 for index1 in range(len(IsFill)) if IsFill[index1] == 1]  # But need to leave out the current fillers.
-fill_items = [images_list[i] for i in fillindx]
+fillindx = [index1 for index1 in range(len(IsFill)) if IsFill[index1] == 3]  # But need to leave out the current fillers.
+fill_items = [pics_list[i] for i in fillindx]
+
+# Correct the sorciere word.
+iwitch = [iw for iw in range(0, len(fill_items)) if fill_items[iw] =='sorcière']
+for iw in iwitch:
+    fill_items[iw] = 'sorciere'
+
 fillitems_u = np.unique(fill_items)
 fillitems_u = fillitems_u.tolist()
 allfills = []
@@ -258,19 +207,19 @@ while tester == 0:
     Itemp1 = DExcelv2.iloc[fillpair_rand]
     Itemp2 = DExcelv2.iloc[fillrand_idx]
 
-    Fill1_imaget = Itemp1.loc[fillpair_rand[0], 'ImageType']   # Image type
-    Fill1_ID     = Itemp1.loc[fillpair_rand[0], 'FillID']      # Filler ID
+    Fill1_imaget = Itemp1.loc[fillpair_rand[0], 'Picture']   # Image type
+    Fill2_imaget = Itemp2.loc[fillrand_idx[0], 'Picture']     # Image type
 
-    Fill2_imaget = Itemp2.loc[fillrand_idx[0], 'ImageType']     # Image type
-    Fill2_ID     = Itemp2.loc[fillrand_idx[0], 'FillID']        # Filler ID
+    if Fill1_imaget == 'sorcière':
+        Fill1_imaget = 'sorciere'
 
-    DExcelv2.loc[fillpair_rand[0], 'ImageType'] = Fill2_imaget
-    DExcelv2.loc[fillpair_rand[0], 'FillID']    = Fill2_ID
+    if Fill2_imaget == 'sorcière':
+        Fill2_imaget = 'sorciere'
 
-    DExcelv2.loc[fillrand_idx, 'ImageType'] = Fill1_imaget
-    DExcelv2.loc[fillrand_idx, 'FillID']    = Fill1_ID
+    DExcelv2.loc[fillpair_rand[0], 'Picture'] = Fill2_imaget
+    DExcelv2.loc[fillrand_idx, 'Picture'] = Fill1_imaget
 
-    # The current filler word and the swapped filler word are excluding from filler word lists.
+    # The current filler word and the swapped filler word are excluded from filler word lists.
     allfills.append(fillitems_u[fcount])
     allfills.append(fword)
 
@@ -290,10 +239,10 @@ with pd.ExcelWriter(xls_path + savefname) as writer:
 
 ### Resume the inter-keyword interval by extracting the indices of occurrence of each keyword.###
 AllKeywords_intval = []
-for wcnt in range(0, len(wordsel)):
-    Windices = [index for (index, item) in enumerate(wordsel) if item == wordsel[wcnt]]
+for wcnt in range(0, len(KeyWord_sel)):
+    Windices = [index for (index, item) in enumerate(KeyWord_sel) if item == KeyWord_sel[wcnt]]
     wdiff = Windices[1] - Windices[0]
-    print("Inter-keyword interval for current word %s is %d" % (wordsel[wcnt], wdiff))
+    print("Inter-keyword interval for current word %s is %d" % (KeyWord_sel[wcnt], wdiff))
     AllKeywords_intval.append(wdiff)
 
 
@@ -303,15 +252,9 @@ for wcnt in range(0, len(wordsel)):
 
 # Prepare the audio column. It needs to show path and .*wav extension.
 allfillers    = DExcelv2['Filler?'].tolist()
-fillindex1    = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers[fillindx1] == 1]   # Find the indiices of the fillers
-audioID = DExcelv2['FillID']
+fillindex1    = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers[fillindx1] == 3]   # Find the indiices of the fillers
+audioID = DExcelv2['StimAudio']
 audio   = 'a/'+audioID+'.wav'
-for acnt in range(0, len(fillindex1)):
-    # Look for matching string in ID list and assign this to the current filler trial.
-    for i, s in enumerate(pictypes):
-        if s in audio[fillindex1[acnt]]:
-            print(i)
-            audio[fillindex1[acnt]] = 'a/'+ ID[i]+'.wav'
 
 # Prepare the ID column.
 IDcol = np.linspace(1,len(audio), len(audio))
@@ -322,12 +265,12 @@ Weightcol = np.ones(len(audio), dtype=int)
 # Prepare the Procedure column.
 P = 'fillerProc'
 Proccol = np.repeat(P, len(audio))
-not_fillindex1 = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers[fillindx1] == 0]
+not_fillindex1 = [fillindx1 for fillindx1 in range(len(allfillers)) if allfillers[fillindx1] < 3]
 for pccnt in range(0, len(not_fillindex1)):
     Proccol[not_fillindex1[pccnt]] = 'trialProc'
 
 # Prepare the Picture column
-imtype = DExcelv2['ImageType'].tolist()
+imtype = DExcelv2['Picture'].tolist()
 qmark  = '?'
 piccol = np.repeat(qmark, len(audio)).T.tolist()
 for pcnt in range(0, len(fillindex1)):
@@ -335,7 +278,7 @@ for pcnt in range(0, len(fillindex1)):
 
 # To prepare the "correct" column test if "ImageType" is in "Stims":
 # If yes ==> correct (Y), if no ==> incorrect (N).
-stimtype = DExcelv2['Stims'].tolist()
+stimtype = DExcelv2['StimulusPhrase'].tolist()
 corrcol = np.repeat(qmark, len(audio)).T.tolist()
 for corrcnt in range(0, len(fillindex1)):
     if imtype[fillindex1[corrcnt]] in stimtype[fillindex1[corrcnt]]:
