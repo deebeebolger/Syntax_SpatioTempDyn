@@ -43,35 +43,19 @@ trigcodes  = trigsIn["triggerCode"].tolist()
 
 StimID_indx = list(np.arange(0, len(StimID)))
 
-Rindx = []         # Randomly chosen indices
-StimIndex_sel = [] # Randomly chosen entry of
+# Initialise lists
+Rindx = []
+StimIndex_sel = []
 KeyWord_sel = []
 Cond_sel = []
 AudStim_sel = []
 Trig_sel = []
 Noun_sel = []
 Phrase_sel = []
-
-wordindxsel = []
 IsFill = []
-TrigAll = []
-ImageType = []
-StimType = []
-FillID = []
-FillID2 = []
 
-Wsel = []
-WIndxsel = []
-IsFiller = []
-AllTrigs = []
-AllImages = []
-AllStims = []
-AllFillID = []
-AllID = []
-
-#def findElements(lst1, lst2):
-#    return [lst1[i] for i in lst2]
-
+# Function to check for the occurrence of Keywords based on rule that the
+# same keyword cannot occur within less than 5 items of each other.
 def test_keywords(Allkeywords, CurrKeywords, cntr, test1):
     if CurrKeywords in Allkeywords:
         print('Looking for neighbouring keywords')
@@ -91,7 +75,8 @@ def test_keywords(Allkeywords, CurrKeywords, cntr, test1):
 
 
 
-tester = 0
+tester = 0      # Initialize the counter
+
 for counter in range(0, len(StimID)):
 
     print(counter)
@@ -116,33 +101,33 @@ for counter in range(0, len(StimID)):
                 print('consecutive fillers')
                 tester1 = 0
 
-                tester = test_keywords(KeyWord_sel, keywordsel, counter, tester1)
+                tester = test_keywords(KeyWord_sel, keywordsel, counter, tester1) # Call of test_keywords() function
 
             else:
                 print('phew! No consecutive fillers')
                 tester1 = 1
-                tester = test_keywords(KeyWord_sel, keywordsel, counter, tester1)
+                tester = test_keywords(KeyWord_sel, keywordsel, counter, tester1)  # Call of test_keywords() function
 
         else:
 
             tester += 1
 
-    StimID_indx.remove(randindx[0])  # Remove the currently selected entry index.
-    StimID.pop(currsel)           # Remove the currently selected and assigned audio stimulus
-    Conds.pop(currsel)   # Remove the currently selected and assigned filler
-    trigcodes.pop(currsel)        # Remove the currently selected and assigned trigger code.
-    stims_sent.pop(currsel)       # Remove the currently selected and assigned sentence stimulus
-    Keywords.pop(currsel)      # Remove the currently selected and assigned keyword
-    nouns.pop(currsel)            # Remove the currently selected and assigned noun.
+    StimID_indx.remove(randindx[0])     # Remove the currently selected entry index.
+    StimID.pop(currsel)                 # Remove the currently selected and assigned audio stimulus
+    Conds.pop(currsel)                  # Remove the currently selected and assigned filler
+    trigcodes.pop(currsel)              # Remove the currently selected and assigned trigger code.
+    stims_sent.pop(currsel)             # Remove the currently selected and assigned sentence stimulus
+    Keywords.pop(currsel)               # Remove the currently selected and assigned keyword
+    nouns.pop(currsel)                  # Remove the currently selected and assigned noun.
 
-    Rindx.append(randindx[0])             # Add the randomly selected index list
-    StimIndex_sel.append(randindx[0])  # Add to the randomly assigned stimulus index list.
-    KeyWord_sel.append(keywordsel)     # Add the the randomly assigned keyword list
-    Cond_sel.append(condsel)         # Add to the randomly assigned filler list
-    AudStim_sel.append(audstim)        # Add to the randomly assigned auditory stimulus list
-    Trig_sel.append(trigsel)       # Add to the randomly assigned trigger code list
-    Phrase_sel.append(stimsel)  # Add to the randomly assigned audio stimulus phrase list.
-    Noun_sel.append(nounsel)       # Add to the randomly assigned nouns list.
+    Rindx.append(randindx[0])               # Add the randomly selected index list
+    StimIndex_sel.append(randindx[0])       # Add to the randomly assigned stimulus index list.
+    KeyWord_sel.append(keywordsel)          # Add the the randomly assigned keyword list
+    Cond_sel.append(condsel)                # Add to the randomly assigned filler list
+    AudStim_sel.append(audstim)             # Add to the randomly assigned auditory stimulus list
+    Trig_sel.append(trigsel)                # Add to the randomly assigned trigger code list
+    Phrase_sel.append(stimsel)              # Add to the randomly assigned audio stimulus phrase list.
+    Noun_sel.append(nounsel)                # Add to the randomly assigned nouns list.
 
     tester = 0
     print(AudStim_sel)
@@ -158,7 +143,10 @@ Data2Excel = D.transpose()
 searchval = [3, 3]
 X = (IsFiller[:-1] == searchval[0]) & (IsFiller[1:] == searchval[1])
 Xfind    = np.where(X)
-
+if len(Xfind) == 0:
+    print('No consecutive fillers found!')
+else:
+    print('Consecutive fillers found!')
 
 ###------Shift the fillers (Pictures column) so that on one occurrence they correspond to auditory stimulation and on second occurrence they
 ## do not correspond to the auditory stimulation (Stims column)---------###
