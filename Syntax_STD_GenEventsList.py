@@ -27,7 +27,7 @@ from array import array
 # Define filenames and paths
 fname = 'Experimental_Lists_Bissera1.xlsx'
 xls_path = r'/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'   # Path in which to save output xlsx files and from which to load fname.
-savefname = 'Pilot0099_EventsList.xlsx'                                     # Name of xlsx file in which to save the events list. The eprime excel file name will be generated from this.
+savefname = 'Pilot0098_EventsList.xlsx'                                     # Name of xlsx file in which to save the events list. The eprime excel file name will be generated from this.
 
 #dataIn = pd.read_excel(xls_path + fname, sheet_name='allStim')
 trigsIn = pd.read_excel(xls_path + fname, sheet_name='triggers')
@@ -41,9 +41,6 @@ stims_sent = trigsIn["stim"].tolist()   # the auditory phrase presented
 trigcodes  = trigsIn["triggerCode"].tolist()
 
 StimID_indx = list(np.arange(0, len(StimID)))
-iwitch = [iw for iw in range(0, len(nouns)) if nouns[iw]=='sorcière']
-for iwnt in iwitch:
-    nouns[iwnt] = 'sorciere'
 
 # Initialise lists
 Rindx = []
@@ -149,58 +146,41 @@ DExcelv2 = Data2Excel
 pics_list = DExcelv2['Picture'].tolist()
 IsFill = DExcelv2.loc[:, 'Filler?']
 IsFill = IsFill.to_list()
-fillindx = [index1 for index1 in range(len(IsFill)) if IsFill[index1] == 3]  # But need to leave out the current fillers.
+fillindx = [index1 for index1 in range(len(IsFill)) if IsFill[index1] == 3]
 fill_items = [pics_list[i] for i in fillindx]
 
 fillitems_u = np.unique(fill_items)
 fillitems_u = fillitems_u.tolist()
 allfills = []
 
-fcount = 0
-tester = 0
 
-while tester == 0:
+while len(fillitems_u) > 0:
 
-    print(fillitems_u[fcount])      # Print to screen the current
+    # Randomly select two filler items
+    randfill1 = np.random.choice(fillitems_u, 2, replace=False)
 
-    indexes = [index for index in range(
-        len(fill_items)) if fill_items[index] == fillitems_u[fcount]]    # Find the indices of the  2 occurrences of each filler picture.
-    I = [fillindx[i1] for i1 in indexes]
-    print(I)
+    # Now find the indices of the occurrences of both fillers.
+    randfill1_indx = [rfindx1 for rfindx1 in range(len(fill_items)) if fill_items[rfindx1] == randfill1[0]]  # Find two occurrences of first random filler
+    randfill2_indx = [rfindx2 for rfindx2 in range(len(fill_items)) if fill_items[rfindx2] == randfill1[1]]  # Find two occurrences of second random filler
 
-    # Randomly select one of the filler pair (I) to become non-compatible.
-    np.random.seed(int(time.time()))
-    fillpair_rand = np.random.choice(I, 1, replace=False)
+    rfIndx1 = [fillindx[cnter1] for cnter1 in randfill1_indx]   # Find the overall indices of the two occurrences of the first randomly choosen filler items.
+    rfIndx2 = [fillindx[cnter2] for cnter2 in randfill2_indx]   # Find the overall indices of the two occurrences of the second randomly choosen filler items.
 
-    # Randomly select one of the other fillers to exchange with fillpair_rand
-    # Find all the other pairs other than the current filler pair (I)
-    fillother_indx = [e for e in fillindx if e not in I]
-    fillrand_idx = np.random.choice(fillother_indx, 1, replace=False)   # The randomly chosen index of other filler for exchange
-    findx = fillindx.index(fillrand_idx)                                # The filler index of the randomly chosen filler
-    fword = fill_items[findx]                                           # The randomly chosen filler word
+    # Randomly choose which of each filler word pair will be swapped.
+    fillpair_rand1 = np.random.choice(rfIndx1, 1, replace=False)
+    fillpair_rand2 = np.random.choice(rfIndx2, 1, replace=False)
 
-    # swap between positions fillpair_rand and fillrand_idx
-    Itemp1 = DExcelv2.iloc[fillpair_rand]
-    Itemp2 = DExcelv2.iloc[fillrand_idx]
+    Itemp1 = DExcelv2.iloc[fillpair_rand1]
+    Fill1_imaget = Itemp1.loc[fillpair_rand1, 'Picture']
+    Itemp2 = DExcelv2.iloc[fillpair_rand2]
+    Fill2_imaget = Itemp2.loc[fillpair_rand2, 'Picture']
 
-    Fill1_imaget = Itemp1.loc[fillpair_rand[0], 'Picture']   # Image type
-    Fill2_imaget = Itemp2.loc[fillrand_idx[0], 'Picture']     # Image type
+    DExcelv2.loc[fillpair_rand1, 'Picture'] = Fill2_imaget[fillpair_rand2[0]]
+    DExcelv2.loc[fillpair_rand2[0], 'Picture'] = Fill1_imaget[fillpair_rand1[0]]
 
-    DExcelv2.loc[fillpair_rand[0], 'Picture'] = Fill2_imaget
-    DExcelv2.loc[fillrand_idx, 'Picture'] = Fill1_imaget
-
-    # The current filler word and the swapped filler word are excluded from filler word lists.
-    allfills.append(fillitems_u[fcount])
-    allfills.append(fword)
-
-    # Redefine the fill item unique list
-    fillitems_u = [fillcnt for fillcnt in fillitems_u if fillcnt not in allfills]
-
-    if len(fillitems_u) == 0:
-        tester = 1
-    else:
-        tester = 0
-
+    # Take out the two fillers already exchanged.
+    fillitems_u.remove(randfill1[0])
+    fillitems_u.remove(randfill1[1])
 
 ###----------------------Write the Dataframe to an Excel file-------------------------------------------------------####
 
