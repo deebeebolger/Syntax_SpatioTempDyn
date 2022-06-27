@@ -170,6 +170,7 @@ while len(fillitems_u) > 0:
     fillpair_rand1 = np.random.choice(rfIndx1, 1, replace=False)
     fillpair_rand2 = np.random.choice(rfIndx2, 1, replace=False)
 
+    # Swap the picture entries.
     Itemp1 = DExcelv2.iloc[fillpair_rand1]
     Fill1_imaget = Itemp1.loc[fillpair_rand1, 'Picture']
     Itemp2 = DExcelv2.iloc[fillpair_rand2]
@@ -256,6 +257,7 @@ IDcol2 = np.linspace(1,len(audio)+2, len(audio)+2)
 IDcol2 = IDcol2.T
 Deprime['ID'] = IDcol2
 
+# Save the final Eprime dataframe to an Excel file.
 savefname1 = savefname[:-5]  +'_eprime.xlsx' # Change to whatever naming system you want.
 with pd.ExcelWriter(xls_path + savefname1) as writer:
     Deprime.to_excel(writer, sheet_name='sheet1', index=False)
