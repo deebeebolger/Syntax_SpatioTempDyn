@@ -4,6 +4,8 @@ from datetime import datetime
 from glob import glob
 from os.path import basename, join, splitext
 from xml.etree.ElementTree import parse
+import pandas as pd
+import json as json
 
 def _parse_xml(xml_file):
     """Parse XML file."""
@@ -88,13 +90,55 @@ def _combine_triggers(data, remapping=None):
             new_trigger[idx] += event_id
     return new_trigger
 
+def load_triginfo(pathin, fnamein, MarksIn):
+    """Load in the excel resuming the trigger information"""
+    triginfo_In = pd.read_excel(pathin + fnamein, sheet_name=0)
+
+    keywords = triginfo_In["Keywords"].tolist()
+    triggers = triginfo_In["Triggers"].tolist()
+    isfiller = triginfo_In["Filler?"].tolist()
+    isadjadv = triginfo_In["Isadj_adv"].tolist()
+    trigdata = MarksIn["trigger_code"].tolist()
+    startsamp = MarksIn["start_sample"].tolist()
+
+    P = ' '
+    keyword_data = np.repeat(P, len(trigdata)).tolist()
+    filler_data = np.zeros(len(trigdata), dtype=int).tolist()
+    isadj_data = np.repeat(P, len(trigdata)).tolist()
+
+    for trigcnt in range(0, len(triggers)):
+        if triggers[trigcnt] in trigdata:
+            tarray = np.array(trigdata)
+            trigindx_curr = np.where(tarray == triggers[trigcnt])[0].tolist()
+            for x in trigindx_curr:
+                keyword_data[x] = keywords[trigcnt]
+                filler_data[x]  = isfiller[trigcnt]
+                isadj_data[x]   = isadjadv[trigcnt]
+        else:
+            print('current verb does not exist in current dataset')
+
+
+    MarksIn['keywords'] = np.array(keyword_data)
+    MarksIn['IsFiller'] = np.array(filler_data)
+    MarksIn['AdjAdv']   = np.array(isadj_data)
+    MarksA = MarksIn.to_numpy()
+
+    return MarksIn, MarksA, triginfo_In
+
+
+
 """****************************** LOAD IN RAW EGI DATA################################"""
-fpath = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/Data/'
-datacurr = '120_20220520_052757.mff'
+fpath = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/Data/eeg_june2022/'
+datacurr = '11_20220712_065255.mff'
 filename = fpath + datacurr
 
-RawIn = mne.io.read_raw_egi(filename, channel_naming='E%d', verbose=None)   # Load in raw EGI data in *.mff format
+trigxl_path = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'
+trigxl_file = 'TriggerCoding_SummaryJuly2022.xlsx'
+
+RawIn = mne.io.read_raw_egi(filename, channel_naming='E%d', verbose=None, preload=True)   # Load in raw EGI data in *.mff format
 sfreq = RawIn.info['sfreq']   # get the sampling frequency
+
+
 
 """Extract the events.
 
@@ -122,8 +166,21 @@ for xml in xml_events:
         event_start = _ns2py_time(event['beginTime'])
         start = (event_start - start_time).total_seconds()
         if event['code'] not in code:
-            code.append(event['code'])
-        marker = {'name': event['code'],
+            cc = event['code'][1:]
+            x = sum(ccint.isalpha() for ccint in cc)
+            if x == 0:
+                code_temp = int(event['code'][1:])
+                curr_code = 256 - code_temp
+                code.append(curr_code)
+            elif x == 1:
+                code_temp = int(event['code'][2:])
+                curr_code = 256 - code_temp
+                code.append(curr_code)
+            elif x > 1:
+                curr_code = 999
+                code.append(curr_code)
+        marker = {'DINs': event['code'],
+                  'trigger_code': curr_code,
                   'start': start,
                   'start_sample': int(np.fix(start * sfreq)),
                   'end': start + float(event['duration']) / 1e9,
@@ -133,8 +190,42 @@ for xml in xml_events:
 events_tims = dict()
 for ev in code:
     trig_samp = list(c['start_sample'] for n,
-                     c in enumerate(markers) if c['name'] == ev)
+                     c in enumerate(markers) if c['trigger_code'] == ev)
     events_tims.update({ev: trig_samp})    # Defines the onset times of each event in dict format.
 
+markers_df = pd.DataFrame.from_dict(markers)
+
+# Call of function to add trigger information to the dataframe.
+markers_df, markers_nda, reftrig_info = load_triginfo(trigxl_path, trigxl_file, markers_df)
+
+# Add the corrected markers to the raw object.
+E = mne.find_events(RawIn)
+E[:,2] = markers_nda[:,1]
+RawIn.add_events(E, 'STI 014', replace=True)
+
+# Create an events dictionary
+events_dict = dict()
+Keysw       = reftrig_info["Keywords"]
+Trigall     = reftrig_info["Triggers"].tolist()
+
+for keyix in range(0,len(Keysw)):
+    Kcurr = Keysw[keyix]
+    kindx = np.where(Keysw == Kcurr)[0].tolist()
+    Tcurr = [Trigall[i] for i in kindx]
+    res   = dict({Kcurr: Tcurr})
+    events_dict = {**events_dict, **res}
+
+RawIn.save(trigxl_path+'11_20220712_065255.fif')
+
+# Write dictionary to a json file
+jfilepath = '/Users/bolger/PycharmProjects/Syntax_SpatioTempDyn_31-05-2022/'
+jfilenom = 'events_dict.json'
+json.dump(events_dict, open(jfilepath+jfilenom, 'w'))
+
+## Write the markers_df dataframe to an excel file.
+savefname1 = datacurr[:-4]  +'_EventsList.xlsx' # Change to whatever naming system you want.
+with pd.ExcelWriter(fpath + savefname1) as writer:
+    markers_df.to_excel(writer, sheet_name='sheet1', index=False)
 
 
+# Add the markers_df dataframe to the Raw data object.
