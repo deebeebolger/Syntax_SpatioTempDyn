@@ -10,6 +10,30 @@ def browseFiles():
     filename = filedialog.askopenfilename(initialdir = cdpath, title="Select a raw file", filetypes=[("MNE data files", "*.*")])
     return filename
 
+def doLowPass(rawdata, sfreq_aim):
+    """Here we low-pass the data at 0.33 of the desired sample rate.
+       This is a first phase of downsampling, which aims to avoid
+       the reduction of temporal precision of events often introduced
+       with resampling.
+       Decimation will be carried out on the segmented data.
+       Note: For this approach to function,the original sampling frequency must be
+       an integer multiple of the new sampling frequency.
+       """
+    sfreq_curr   = rawdata.info["sfreq"]
+    decim        = np.round(sfreq_curr/sfreq_aim).astype(int)
+    sfreq_new    = sfreq_curr/decim
+    freq_lowpass = sfreq_new/3
+    print('The low-pass frequency is {} Hz'.format(freq_lowpass))
+
+    rawfil_lp = rawdata.copy().filter(l_freq = None, h_freq=freq_lowpass)
+
+
+def plotSpectrum():
+    """Function to plot the spectrum of selected electrodes.
+       This can be useful for detecting noisy electrodes.
+       """
+    psd_out, freq_out = mne.time_frequency.psd_welch(rawfilt, fmin=0.4, fmax=80, tmin=100, tmax=400, picks=[])
+
 """****************************** LOAD IN CONTINUOUS DATA IN .FIF FORMAT################################"""
 filename = browseFiles()
 rawIn = mne.io.read_raw_fif(filename, allow_maxshield=True, preload=True, verbose=None)
@@ -56,34 +80,22 @@ mne.viz.plot_raw(raw_eeg, events=Events, duration=10.0, n_channels=10,title='Raw
 ### ************* Set the electrode montage for the current data ************************
 """Here using GSN-HydroCel-257 montage. 
    Visualizing the montage in 2D.
+   Assign montage to raw object (rawIn).
    """
 montage_all = mne.channels.get_builtin_montages()
 montindx = montage_all.index('GSN-HydroCel-257')
 montage = mne.channels.make_standard_montage(montage_all[montindx])
-montage.rename_channels({'Cz':'E257'})
-mne.viz.plot_montage(montage)
-rawIn.set_montage(montage)  # Assign the montage to the rawIn object.
+montage.rename_channels({'Cz':'E257'})       # Changing channel 'Cz' in montage to 'E257.
+mne.viz.plot_montage(montage)                # Visualize montage.
+rawIn.set_montage(montage)                   # Assign the montage to the rawIn object.
 
-#%% Downsample the continuous data from 500Hz to 250Hz ***************************
-newfreq = 250
-rawrs = rawIn.copy().resample(sfreq=newfreq)
-print('The new sampling frequency is: ',rawrs.info['sfreq'],'Hz')
 
-#%% Apply a FIR bandpass filter which will conserve activity in the 0.1Hz to 80Hz frequency band and reject all others.
-"""As filtering transforms the raw object, we make a copy of it and apply the filter to this copy; 
-   rawfilt is now our filtered object.
-   We are filtering the downsampled data (rawrs).
-   The data is band pass filtered between 0.1Hz and 80Hz.
-   We can see if we can push the lower limit down to 0.05Hz without leaving too 
-   much slow drift.
-   Note that the raw object data has to be preloaded upon import to be filtered.
-   """
-rawfilt = rawrs.copy().filter(0.1, 80, n_jobs=2, fir_design='firwin')   # need to look up the filter parameters again!!
+
+#
 
 ### ********************* Detecting Bad Electrodes *************************
 # Another way of calculating and plotting the PSD in MNE.
 
-psd_out, freq_out = mne.time_frequency.psd_welch(rawfilt, fmin=0.4, fmax=80, tmin=100, tmax=400, picks=[])
 
 
 
