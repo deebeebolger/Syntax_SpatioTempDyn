@@ -147,8 +147,6 @@ trigxl_file = 'TriggerCoding_SummaryJuly2022.xlsx'
 RawIn = mne.io.read_raw_egi(filename, channel_naming='E%d', verbose=None, preload=True)   # Load in raw EGI data in *.mff format
 sfreq = RawIn.info['sfreq']   # get the sampling frequency
 
-
-
 """Extract the events.
 
 Parameters

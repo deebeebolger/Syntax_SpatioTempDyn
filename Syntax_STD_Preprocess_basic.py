@@ -12,6 +12,23 @@ def browseFiles():
                                           filetypes=[("MNE data files", "*.*")])
     return filename
 
+def viz_allchans(rawdata, vizdur, channum_viz):
+    """ Simple Visualization of all Channels stacked
+        Note that in the following we are only visualizing the EEG channels
+        The time interval (in seconds) and the number of electrodes presented in the main window is defined
+        when calling the visualisation method.
+        The events are indicated on the plot (red lines).
+        The DC offset is applied for visualisation purposes because is not yet high-pass filtered.
+        You change the scale of visualisation using the '+' and '-' keys on your keyboard.
+        You can scroll through the data in time using the right/left arrows on your keyboard.
+        Time intervals with data missing are/should be indicated on the time-bar at the bottom of the figure.
+        Here you can begin to identify bad/noisy electrodes.
+        """
+
+    Events = mne.find_events(rawdata)  # Extract the events as an ndarray
+    raw_eeg = rawdata.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
+    mne.viz.plot_raw(raw_eeg, events=Events, duration=vizdur, n_channels=channum_viz, title='Raw EEG Data', event_color='red',
+                     remove_dc=True)
 
 def _dolowpass(rawdata, sfreq_aim, chnoms_all, chnoms):
     """Here we low-pass the data at 0.33 of the desired sample rate.
@@ -70,9 +87,9 @@ print(rawIn.copy().pick_types(meg=False, eeg=True).ch_names)
 print('The trig channels are as follows: \n')
 print(rawIn.copy().pick_types(meg=False, misc=True).ch_names)
 hpfilt = rawIn.info['highpass']
-print("High-pass filter cutoff: " + str(hpfilt) + "Hz")  # Print high-frequency cut-off frequency to screen.
+print('High-pass filter cutoff: ', hpfilt, 'Hz')  # Print high-frequency cut-off frequency to screen.
 lowfilt = rawIn.info['lowpass']
-print("Low-pass filter cutoff: " + str(lowfilt) + "Hz")  # Print low-frequency cut-off frequency to screen.
+print('Low-pass filter cutoff: ', lowfilt,'Hz')  # Print low-frequency cut-off frequency to screen.
 
 # Exract the time vector in seconds
 time_secs = rawIn.times
@@ -80,22 +97,6 @@ time_secs = rawIn.times
 print('Sampling frequency of current dataset: ', rawIn.info['sfreq'], 'Hz', '\n')
 print('The current dataset has {} time samples and {} channels \n'.format(rawIn.n_times, len(ch_names)))
 print('The duration of the current dataset is: {}seconds'.format(time_secs[-1]))
-
-# ************ Simple Visualization of all Channels **********************************
-""" Note that in the following we are only visualizing the EEG channels
-    The time interval (in seconds) and the number of electrodes presented in the main window is defined
-    when calling the visualisation method.
-    The events are indicated on the plot (red lines).
-    The DC offset is applied for visualisation purposes because is not yet high-pass filtered.
-    You change the scale of visualisation using the '+' and '-' keys on your keyboard.
-    You can scroll through the data in time using the right/left arrows on your keyboard.
-    Time intervals with data missing are/should be indicated on the time-bar at the bottom of the figure.
-    Here you can begin to identify bad/noisy electrodes."""
-
-Events = mne.find_events(rawIn)  # Extract the events as an ndarray
-raw_eeg = rawIn.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
-mne.viz.plot_raw(raw_eeg, events=Events, duration=10.0, n_channels=10, title='Raw EEG Data', event_color='red',
-                 remove_dc=True)
 
 ### ************* Set the electrode montage for the current data ************************
 """Here using GSN-HydroCel-257 montage. 
@@ -110,11 +111,16 @@ mne.viz.plot_montage(montage)  # Visualize montage.
 rawIn.set_montage(montage)  # Assign the montage to the rawIn object.
 
 ##*********************** Carry out low-pass and high-pass filtering ******************
-new_sfreq = 250                                                     # Define the sampling frequency (Hz) desired after downsampling.
-rawfilt_LP = _dolowpass(rawIn, new_sfreq, ch_names_all, ch_names)   # Call of function to carry out low-pass filtering.
-
+  # Call of function to carry out low-pass filtering.
+new_sfreq = 125                                                     # Define the sampling frequency (Hz) desired after downsampling.
+rawfilt_LP = _dolowpass(rawIn, new_sfreq, ch_names_all, ch_names)
 hplim = .1                                                          # High-pass filter cutoff, .1Hz
 rawfilt_HP = _dohighpass(rawfilt_LP, hplim, ch_names_all, ch_names) # Call of function to carry out high-pass filtering.
+
+## ********************* Call of function viz_allchans() to plot all chans
+wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
+wind_nchans = 20         # Number of channels presented in each window.
+viz_allchans(rawfilt_HP, wind_dur, wind_nchans)
 
 ### ********************* Detecting Bad Electrodes *************************
 # Another way of calculating and plotting the PSD in MNE.
