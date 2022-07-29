@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+
 def browseFiles():
     cdpath = os.getcwd()
     filename = filedialog.askopenfilename(initialdir=cdpath, title="Select a raw file",
@@ -22,13 +23,18 @@ def viz_allchans(rawdata, vizdur, channum_viz):
         You change the scale of visualisation using the '+' and '-' keys on your keyboard.
         You can scroll through the data in time using the right/left arrows on your keyboard.
         Time intervals with data missing are/should be indicated on the time-bar at the bottom of the figure.
-        Here you can begin to identify bad/noisy electrodes.
+        Here you can begin to identify bad/noisy electrodes by simply selecting them on the figure (just clicking on them).
+        When you close the visualisation window the channels you marked as bad will be displayed in the console and will appear in
+        rawdata.info['bads]
         """
 
     Events = mne.find_events(rawdata)  # Extract the events as an ndarray
     raw_eeg = rawdata.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
-    mne.viz.plot_raw(raw_eeg, events=Events, duration=vizdur, n_channels=channum_viz, title='Raw EEG Data', event_color='red',
-                     remove_dc=True)
+    figviz = mne.viz.plot_raw(raw_eeg, events=Events, duration=vizdur, n_channels=channum_viz, title='Raw EEG Data', event_color='red',
+                     remove_dc=True, block=False, show=True)
+
+    bads = raw_eeg.info['bads']
+    return bads
 
 def _dolowpass(rawdata, sfreq_aim, chnoms_all, chnoms):
     """Here we low-pass the data at 0.33 of the desired sample rate.
@@ -63,11 +69,32 @@ def _dohighpass(rawdata, hpfreq, chnoms_all, chnoms):
                                        l_trans_bandwidth=trans_bandwidth, n_jobs=1, fir_design ='firwin')
     return rawfilt_hp
 
-def plotSpectrum(rawdata):
+def findNextPowerOf2(L):
+    # decrement `n` (to handle cases when `n` itself
+    # is a power of 2)
+    L = L - 1
+
+    # do till only one bit is left
+    while L & L - 1:
+        L = L & L - 1  # unset rightmost bit
+
+    # `n` is now a power of two (less than `n`)
+
+    # return next power of 2
+    return L << 1
+
+def plotSpectrum(rawdata, powtwoL, chindx):
     """Function to plot the spectrum of selected electrodes.
        This can be useful for detecting noisy electrodes.
        """
-    psd_out, freq_out = mne.time_frequency.psd_welch(rawdata, fmin=0.4, fmax=80, tmin=100, tmax=400, picks=[])
+
+    nfft_len = powtwoL
+    L = rawdata.last_samp
+    psd_out, freq_out = mne.time_frequency.psd_welch(rawfilt_HP, fmin=0.4, fmax=60, tmin=0, tmax=rawdata.times.max(), picks=chindx, n_fft=256)
+    log_psd = 10*np.log10(psd_out)
+    plt.plot(freq_out, log_psd.T)
+
+
 
 
 """****************************** LOAD IN CONTINUOUS DATA IN .FIF FORMAT################################"""
@@ -120,7 +147,14 @@ rawfilt_HP = _dohighpass(rawfilt_LP, hplim, ch_names_all, ch_names) # Call of fu
 ## ********************* Call of function viz_allchans() to plot all chans
 wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
 wind_nchans = 20         # Number of channels presented in each window.
-viz_allchans(rawfilt_HP, wind_dur, wind_nchans)
+badchans = viz_allchans(rawfilt_HP, wind_dur, wind_nchans)
+print('The channels pre-selected as bad are: {}'.format(badchans))
+
 
 ### ********************* Detecting Bad Electrodes *************************
-# Another way of calculating and plotting the PSD in MNE.
+
+lensig = rawfilt_HP.last_samp
+pow2 = findNextPowerOf2(int(lensig))
+chanindx = [ch_names_all.index(ic) for ic in ch_names]
+print('Signal length is {} and the nearest power of two is {}'.format(lensig, pow2))
+plotSpectrum(rawfilt_HP, pow2, chanindx)
