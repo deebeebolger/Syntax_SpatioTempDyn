@@ -3,9 +3,9 @@ from tkinter import filedialog
 import os
 import mne
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
-
-
+matplotlib.use('MacOSX')
 
 def browseFiles():
     cdpath = os.getcwd()
@@ -90,12 +90,25 @@ def plotSpectrum(rawdata, powtwoL, chindx):
 
     nfft_len = powtwoL
     L = rawdata.last_samp
-    psd_out, freq_out = mne.time_frequency.psd_welch(rawfilt_HP, fmin=0.4, fmax=60, tmin=0, tmax=rawdata.times.max(), picks=chindx, n_fft=256)
+    psd_out, freq_out = mne.time_frequency.psd_welch(rawfilt_HP, fmin=0.4, fmax=60, tmin=0, tmax=rawdata.times.max(), picks=chindx, n_fft=256,
+                                                 reject_by_annotation=TRUE)
+    np.seterr(divide='ignore')
     log_psd = 10*np.log10(psd_out)
-    plt.plot(freq_out, log_psd.T)
+    np.seterr(divide='warn')
+    _, ax = plt.subplots()
+    ax.plot(freq_out, log_psd.T)
+    ax.set(title='Welch PSD of band-pass filtered data', xlabel='Frequency (Hz)', ylabel='Power Spectral Density (dB)')
+    plt.show()
 
-
-
+def create_savepath(fstring, sfix):
+    fs = fstring.split('/')
+    datacurr = fs[-1]
+    data2save = datacurr.split('.')
+    rawout_name = data2save[0] + '_' + sfix + '.fif'
+    fs1 = fs[0:-1]
+    savepath = '/'.join(fs1)
+    savepath = savepath + '/'
+    return savepath, rawout_name
 
 """****************************** LOAD IN CONTINUOUS DATA IN .FIF FORMAT################################"""
 filename = browseFiles()
@@ -139,22 +152,27 @@ rawIn.set_montage(montage)  # Assign the montage to the rawIn object.
 
 ##*********************** Carry out low-pass and high-pass filtering ******************
   # Call of function to carry out low-pass filtering.
-new_sfreq = 125                                                     # Define the sampling frequency (Hz) desired after downsampling.
+new_sfreq = 250                                                     # Define the sampling frequency (Hz) desired after downsampling.
 rawfilt_LP = _dolowpass(rawIn, new_sfreq, ch_names_all, ch_names)
 hplim = .1                                                          # High-pass filter cutoff, .1Hz
 rawfilt_HP = _dohighpass(rawfilt_LP, hplim, ch_names_all, ch_names) # Call of function to carry out high-pass filtering.
 
+### ********************* Detecting Bad Electrodes *************************
+
+lensig = rawfilt_HP.last_samp
+round(len(rawfilt_HP)/10)
+pow2 = findNextPowerOf2(int(lensig/2))
+chanindx = [ch_names_all.index(ic) for ic in ch_names]
+print('Signal length is {} and the nearest power of two is {}'.format(lensig, pow2))
+plotSpectrum(rawfilt_HP, pow2, chanindx)
+print('****plotted spectrum')
+
 ## ********************* Call of function viz_allchans() to plot all chans
-wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
+wind_dur    = 20         # Duration of time interval (in seconds) presented in each window.
 wind_nchans = 20         # Number of channels presented in each window.
 badchans = viz_allchans(rawfilt_HP, wind_dur, wind_nchans)
 print('The channels pre-selected as bad are: {}'.format(badchans))
 
-
-### ********************* Detecting Bad Electrodes *************************
-
-lensig = rawfilt_HP.last_samp
-pow2 = findNextPowerOf2(int(lensig))
-chanindx = [ch_names_all.index(ic) for ic in ch_names]
-print('Signal length is {} and the nearest power of two is {}'.format(lensig, pow2))
-plotSpectrum(rawfilt_HP, pow2, chanindx)
+suffix = 'bandpass'
+path2save, fsave_name = create_savepath(filename,suffix)
+rawfilt_HP.save(path2save + fsave_name)

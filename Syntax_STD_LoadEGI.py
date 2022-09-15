@@ -141,7 +141,7 @@ filename = browseFiles()
 fs = filename.split('/')
 datacurr = fs[-1]
 
-trigxl_path = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/Data_Preprocessed/'
+trigxl_path = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'
 trigxl_file = 'TriggerCoding_SummaryJuly2022.xlsx'
 
 RawIn = mne.io.read_raw_egi(filename, channel_naming='E%d', verbose=None, preload=True)   # Load in raw EGI data in *.mff format
@@ -177,11 +177,11 @@ for xml in xml_events:
             x = sum(ccint.isalpha() for ccint in cc)
             if x == 0:
                 code_temp = int(event['code'][1:])
-                curr_code = 256 - code_temp
+                curr_code = 255 - code_temp
                 code.append(curr_code)
             elif x == 1:
                 code_temp = int(event['code'][2:])
-                curr_code = 256 - code_temp
+                curr_code = 255 - code_temp
                 code.append(curr_code)
             elif x > 1:
                 curr_code = 999
