@@ -48,7 +48,7 @@ def _dolowpass(rawdata, sfreq_aim, chnoms_all, chnoms):
     sfreq_curr = rawdata.info["sfreq"]
     decim = np.round(sfreq_curr / sfreq_aim).astype(int)
     sfreq_new = sfreq_curr / decim
-    freq_lowpass = sfreq_new / 3
+    freq_lowpass = sfreq_new / 6
     print('The low-pass frequency is {} Hz'.format(freq_lowpass))
 
     chindx = [chnoms_all.index(ic) for ic in chnoms]  # Find the indices of the 'eeg' channels.
@@ -86,7 +86,7 @@ def findNextPowerOf2(L):
 def plotSpectrum(rawdata, powtwoL, chindx):
     """Function to plot the spectrum of selected electrodes.
        This can be useful for detecting noisy electrodes.
-       """
+    """
 
     nfft_len = powtwoL
     L = rawdata.last_samp
@@ -168,8 +168,8 @@ plotSpectrum(rawfilt_HP, pow2, chanindx)
 print('****plotted spectrum')
 
 ## ********************* Call of function viz_allchans() to plot all chans
-wind_dur    = 20         # Duration of time interval (in seconds) presented in each window.
-wind_nchans = 20         # Number of channels presented in each window.
+wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
+wind_nchans = 50         # Number of channels presented in each window.
 badchans = viz_allchans(rawfilt_HP, wind_dur, wind_nchans)
 print('The channels pre-selected as bad are: {}'.format(badchans))
 
