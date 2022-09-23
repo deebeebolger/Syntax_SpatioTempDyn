@@ -5,6 +5,10 @@ import mne
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+
+from meegkit import dss
+from meegkit.utils import create_line_data, unfold
+
 matplotlib.use('MacOSX')
 
 def browseFiles():
@@ -166,6 +170,11 @@ chanindx = [ch_names_all.index(ic) for ic in ch_names]
 print('Signal length is {} and the nearest power of two is {}'.format(lensig, pow2))
 plotSpectrum(rawfilt_HP, pow2, chanindx)
 print('****plotted spectrum')
+
+### ******* Apply the zpline function (from the meegkit package) to remove line noise *********####
+
+## Call of function here in which the zapline function is run.
+dss.dss_line(rawfilt_HP, 50, new_sfreq, nfft=500)
 
 ## ********************* Call of function viz_allchans() to plot all chans
 wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.

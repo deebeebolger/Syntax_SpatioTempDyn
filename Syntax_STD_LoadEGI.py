@@ -133,16 +133,20 @@ def load_triginfo(pathin, fnamein, MarksIn):
 
     return MarksIn, MarksA, triginfo_In
 
-
-
 """****************************** LOAD IN RAW EGI DATA################################"""
-fpath = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/Data/eeg_june2022/'
 filename = browseFiles()
 fs = filename.split('/')
 datacurr = fs[-1]
 
-trigxl_path = '/Users/bolger/Documents/work/Projects/SpatioTempDyn_Syntax/'
-trigxl_file = 'TriggerCoding_SummaryJuly2022.xlsx'
+#**** Set the path in which to save the data and the events list*******
+# These directories should be in the same folder from which you loaded the data.
+
+
+#*********Set the search path for the TriggerCoding_Summary.xlsx file to the current script directory******##
+trigxl_path_all = os.path.abspath('Syntax_STD_LoadEGI.py')
+trigXL          = trigxl_path_all.split('/')
+trigxl_path     = '/'.join(trigXL[:-1])+'/'
+trigxl_file     = 'TriggerCoding_SummaryJuly2022.xlsx'
 
 RawIn = mne.io.read_raw_egi(filename, channel_naming='E%d', verbose=None, preload=True)   # Load in raw EGI data in *.mff format
 sfreq = RawIn.info['sfreq']   # get the sampling frequency
