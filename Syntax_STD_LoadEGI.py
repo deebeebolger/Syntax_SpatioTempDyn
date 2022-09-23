@@ -137,21 +137,24 @@ def load_triginfo(pathin, fnamein, MarksIn):
 filename = browseFiles()
 fs = filename.split('/')
 datacurr = fs[-1]
+basedir  = '/'.join(fs[:-1])+'/'
 
 #**** Set the path in which to save the data and the events list*******
 # These directories should be in the same folder from which you loaded the data.
-savedata_path   = '/'.join(fs[:-1])+'/'+'Data'+'/'
-saveEvents_path = '/'.join(fs[:-1])+'/'+'EventFiles'+'/'
+Datadir  = 'Data'
+Eventdir = 'EventFiles'
+savedata_path   = '/'.join(fs[:-1])+'/'+Datadir+'/'
+saveEvents_path = '/'.join(fs[:-1])+'/'+Eventdir+'/'
 
 if os.path.exists(savedata_path)==FALSE:
     os.mkdir(savedata_path)
 else:
-    print('Directory and path: {} already exists.\n' .format(savedata_path))
+    print('Directory: {} and path: {} already exists.\n' .format(Datadir, basedir ))
 
 if os.path.exists(saveEvents_path)==FALSE:
     os.mkdir(saveEvents_path)
 else:
-    print('Directory and path: {} already exists.\n'.format(saveEvents_path))
+    print('Directory: {} and path: {} already exists.\n'.format(Eventdir, basedir))
 
 
 #*********Set the search path for the TriggerCoding_Summary.xlsx file to the current script directory******##
