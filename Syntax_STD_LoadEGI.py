@@ -140,6 +140,18 @@ datacurr = fs[-1]
 
 #**** Set the path in which to save the data and the events list*******
 # These directories should be in the same folder from which you loaded the data.
+savedata_path   = '/'.join(fs[:-1])+'/'+'Data'+'/'
+saveEvents_path = '/'.join(fs[:-1])+'/'+'EventFiles'+'/'
+
+if os.path.exists(savedata_path)==FALSE:
+    os.mkdir(savedata_path)
+else:
+    print('Directory and path: {} already exists.\n' .format(savedata_path))
+
+if os.path.exists(saveEvents_path)==FALSE:
+    os.mkdir(saveEvents_path)
+else:
+    print('Directory and path: {} already exists.\n'.format(saveEvents_path))
 
 
 #*********Set the search path for the TriggerCoding_Summary.xlsx file to the current script directory******##
@@ -228,7 +240,7 @@ for keyix in range(0,len(Keysw)):
 
 rawout_title = datacurr.split('.')
 rawout_name  = rawout_title[0] + '.fif'
-RawIn.save(trigxl_path+rawout_name)
+RawIn.save(savedata_path+rawout_name)
 
 # Write dictionary to a json file
 jfilepath = '/Users/bolger/PycharmProjects/Syntax_SpatioTempDyn_31-05-2022/'
@@ -237,5 +249,5 @@ json.dump(events_dict, open(jfilepath+jfilenom, 'w'))
 
 ## Write the markers_df dataframe to an excel file.
 savefname1 = datacurr[:-4]  +'_EventsList.xlsx' # Change to whatever naming system you want.
-with pd.ExcelWriter(fpath + savefname1) as writer:
+with pd.ExcelWriter(saveEvents_path + savefname1) as writer:
     markers_df.to_excel(writer, sheet_name='sheet1', index=False)
