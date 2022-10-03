@@ -133,6 +133,28 @@ def load_triginfo(pathin, fnamein, MarksIn):
 
     return MarksIn, MarksA, triginfo_In
 
+def create_bidsevents(markersIn, savepath, sujname_curr):
+
+    # Create a dataframe from the following lists.
+    onsets = markersIn['start'].T.tolist()
+    durcol = np.repeat('n/a', len(onsets)).tolist()
+    samps  = markersIn['start_sample'].T.tolist()
+    trigs  = markersIn['trigger_code'].T.tolist()
+    keywd  = markersIn['keywords'].T.tolist()
+    fillr  = markersIn['IsFiller'].T.tolist()
+    wtype  = markersIn['AdjAdv'].T.tolist()
+
+    allists = [onsets, durcol, samps, keywd, fillr, wtype, trigs]
+    cols    = ["onsets", "duration", "sample", "keyword", "IsFiller", "Word_type", "trigger_codes"]
+    eventsDF = pd.DataFrame(np.transpose(allists), columns = ["onsets", "duration", "sample", "keyword", "IsFiller", "Word_type", "trigger_codes"])
+    print(eventsDF)
+    currnom = 'sub-' + sujname_curr[:-4] + '_events.tsv'
+    savepath_curr = savepath + currnom
+    eventsDF.to_csv(savepath_curr, sep="\t")
+
+    return eventsDF
+
+
 """****************************** LOAD IN RAW EGI DATA################################"""
 filename = browseFiles()
 fs = filename.split('/')
@@ -156,6 +178,20 @@ if os.path.exists(saveEvents_path)==FALSE:
 else:
     print('Directory: {} and path: {} already exists.\n'.format(Eventdir, basedir))
 
+# Create a directory for the current participant.
+newsub_dir = 'sub-' + datacurr[0:2]
+save_currsuj_path = savedata_path + newsub_dir + '/'
+if os.path.exists(save_currsuj_path)==FALSE:
+    os.mkdir(save_currsuj_path)
+else:
+    print('Directory: {} and path: {} already exists.\n'.format(newsub_dir, save_currsuj_path))
+
+# Create an "eeg" folder within the current directory in which to save eeg data.
+saveeeg_dir = save_currsuj_path + 'eeg' + '/'
+if os.path.exists(saveeeg_dir)==FALSE:
+    os.mkdir(saveeeg_dir)
+else:
+    print('Directory: {} and path: {} already exists.\n'.format('eeg', saveeeg_dir))
 
 #*********Set the search path for the TriggerCoding_Summary.xlsx file to the current script directory******##
 trigxl_path_all = os.path.abspath('Syntax_STD_LoadEGI.py')
@@ -224,6 +260,7 @@ markers_df = pd.DataFrame.from_dict(markers)
 # Call of function to add trigger information to the dataframe.
 markers_df, markers_nda, reftrig_info = load_triginfo(trigxl_path, trigxl_file, markers_df)
 
+
 # Add the corrected markers to the raw object.
 E = mne.find_events(RawIn)
 E[:,2] = markers_nda[:,1]
@@ -241,13 +278,18 @@ for keyix in range(0,len(Keysw)):
     res   = dict({Kcurr: Tcurr})
     events_dict = {**events_dict, **res}
 
+## Save the current subject raw file
 rawout_title = datacurr.split('.')
-rawout_name  = rawout_title[0] + '.fif'
-RawIn.save(savedata_path+rawout_name)
+rawout_name  = 'sub-'+rawout_title[0] + '.fif'
+RawIn.save(saveeeg_dir+rawout_name)
+
+# Need a call of function to create the events.tsv file for the current participant.
+# note that this file should be saved with the dataset (.fif)
+eventbids = create_bidsevents(markers_df, save_currsuj_path, datacurr)
 
 # Write dictionary to a json file
-jfilepath = '/Users/bolger/PycharmProjects/Syntax_SpatioTempDyn_31-05-2022/'
-jfilenom = 'events_dict.json'
+jfilepath = save_currsuj_path
+jfilenom = 'sub-'+ datacurr[:-4] + '_events_dict.json'
 json.dump(events_dict, open(jfilepath+jfilenom, 'w'))
 
 ## Write the markers_df dataframe to an excel file.
