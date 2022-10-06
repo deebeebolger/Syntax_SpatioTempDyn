@@ -42,7 +42,6 @@ filename = browseFiles()
 dataIn = mne.io.read_raw_fif(filename, allow_maxshield=True, preload=True, verbose=None)
 
 ## ********************* Call of function viz_allchans() to plot all chans****************
-wind_dur    = 20         # Duration of time interval (in seconds) presented in each window.
-wind_nchans = 20         # Number of channels presented in each window.
+wind_dur    = 60         # Duration of time interval (in seconds) presented in each window.
+wind_nchans = 50         # Number of channels presented in each window.
 badchans = viz_allchans(dataIn, wind_dur, wind_nchans)
-

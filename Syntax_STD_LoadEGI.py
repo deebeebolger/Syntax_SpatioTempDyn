@@ -103,6 +103,7 @@ def load_triginfo(pathin, fnamein, MarksIn):
     triginfo_In = pd.read_excel(pathin + fnamein, sheet_name=0)
 
     keywords = triginfo_In["Keywords"].tolist()
+    stimID   = triginfo_In["StimID"].tolist()
     triggers = triginfo_In["Triggers"].tolist()
     isfiller = triginfo_In["Filler?"].tolist()
     isadjadv = triginfo_In["Isadj_adv"].tolist()
@@ -111,6 +112,7 @@ def load_triginfo(pathin, fnamein, MarksIn):
 
     P = ' '
     keyword_data = np.repeat(P, len(trigdata)).tolist()
+    stimID_data  = np.repeat(P, len(trigdata)).tolist()
     filler_data = np.zeros(len(trigdata), dtype=int).tolist()
     isadj_data = np.repeat(P, len(trigdata)).tolist()
 
@@ -120,6 +122,7 @@ def load_triginfo(pathin, fnamein, MarksIn):
             trigindx_curr = np.where(tarray == triggers[trigcnt])[0].tolist()
             for x in trigindx_curr:
                 keyword_data[x] = keywords[trigcnt]
+                stimID_data[x]  = stimID[trigcnt]
                 filler_data[x]  = isfiller[trigcnt]
                 isadj_data[x]   = isadjadv[trigcnt]
         else:
@@ -127,6 +130,7 @@ def load_triginfo(pathin, fnamein, MarksIn):
 
 
     MarksIn['keywords'] = np.array(keyword_data)
+    MarksIn['stimID']   = np.array(stimID_data)
     MarksIn['IsFiller'] = np.array(filler_data)
     MarksIn['AdjAdv']   = np.array(isadj_data)
     MarksA = MarksIn.to_numpy()
@@ -152,21 +156,30 @@ def create_bidsevents(markersIn, savepath, sujname_curr):
     savepath_curr = savepath + currnom
     eventsDF.to_csv(savepath_curr, sep="\t")
 
-    return eventsDF
+    return eventsDF, currnom
 
 
 """****************************** LOAD IN RAW EGI DATA################################"""
 filename = browseFiles()
 fs = filename.split('/')
 datacurr = fs[-1]
-basedir  = '/'.join(fs[:-1])+'/'
+basedir  = '/'.join(fs[:-2])
+print('The base directory is: {}\n' .format(basedir))
+
+# Load in the onsets_file
+fonsets = 'onset_times.xlsx'
+onset_path = '/'.join([basedir, fonsets])
+Onset_info = pd.read_excel(onset_path)
+Onset_stim = Onset_info['STIM']
+Onset_adjst = Onset_info['ADJ_START']
+Onset_advst = Onset_info['ADV_START']
 
 #**** Set the path in which to save the data and the events list*******
 # These directories should be in the same folder from which you loaded the data.
 Datadir  = 'Data'
 Eventdir = 'EventFiles'
-savedata_path   = '/'.join(fs[:-1])+'/'+Datadir+'/'
-saveEvents_path = '/'.join(fs[:-1])+'/'+Eventdir+'/'
+savedata_path   = basedir +'/' + Datadir +'/'
+saveEvents_path = basedir +'/' + Eventdir +'/'
 
 if os.path.exists(savedata_path)==FALSE:
     os.mkdir(savedata_path)
@@ -178,16 +191,33 @@ if os.path.exists(saveEvents_path)==FALSE:
 else:
     print('Directory: {} and path: {} already exists.\n'.format(Eventdir, basedir))
 
+##****** CREATE THE STUDY DIRECTORY*****
+study_name = 'SyntaxDyn_hd'
+sdir       = [basedir, study_name]
+studydir   =  '/'.join(sdir)
+
 # Create a directory for the current participant.
-newsub_dir = 'sub-' + datacurr[0:2]
-save_currsuj_path = savedata_path + newsub_dir + '/'
+if datacurr[1] =='_':
+    newsub_dir = 'sub-' + '0' + datacurr[0]
+else:
+    newsub_dir = 'sub-' + datacurr[0:2]
+save_currsuj_path = '/'.join([studydir, newsub_dir])
 if os.path.exists(save_currsuj_path)==FALSE:
     os.mkdir(save_currsuj_path)
 else:
     print('Directory: {} and path: {} already exists.\n'.format(newsub_dir, save_currsuj_path))
 
+## Create a session directory within the newsub_dir directory
+session_dir = 'ses-1'
+save_sessionpath = '/'.join([save_currsuj_path, session_dir])
+if os.path.exists(save_sessionpath)==FALSE:
+    os.mkdir(save_sessionpath)
+else:
+    print('Directory: {} and path: {} already exists.\n'.format(session_dir, save_currsuj_path))
+
 # Create an "eeg" folder within the current directory in which to save eeg data.
-saveeeg_dir = save_currsuj_path + 'eeg' + '/'
+eeg_dir = 'eeg'
+saveeeg_dir = '/'.join([save_sessionpath, eeg_dir])
 if os.path.exists(saveeeg_dir)==FALSE:
     os.mkdir(saveeeg_dir)
 else:
@@ -260,36 +290,73 @@ markers_df = pd.DataFrame.from_dict(markers)
 # Call of function to add trigger information to the dataframe.
 markers_df, markers_nda, reftrig_info = load_triginfo(trigxl_path, trigxl_file, markers_df)
 
-
 # Add the corrected markers to the raw object.
 E = mne.find_events(RawIn)
 E[:,2] = markers_nda[:,1]
 RawIn.add_events(E, 'STI 014', replace=True)
 
 # Create an events dictionary
-events_dict = dict()
-Keysw       = reftrig_info["Keywords"]
-Trigall     = reftrig_info["Triggers"].tolist()
+events_dict  = dict()
+Keysw_notlist = reftrig_info["Keywords"]
+Keysw        = reftrig_info["Keywords"]
+Trigall      = reftrig_info["Triggers"].tolist()
+IsAdjAdv     = reftrig_info["Isadj_adv"].tolist()
+IsFiller_all = reftrig_info["Filler?"].tolist()
+AdjAdv_wd  = reftrig_info["Adj_Advb"].tolist()
+StimID_all = reftrig_info["StimID"]
 
 for keyix in range(0,len(Keysw)):
-    Kcurr = Keysw[keyix]
-    kindx = np.where(Keysw == Kcurr)[0].tolist()
-    Tcurr = [Trigall[i] for i in kindx]
-    res   = dict({Kcurr: Tcurr})
-    events_dict = {**events_dict, **res}
+    Kcurr        = Keysw[keyix]
+    kindx        = np.where( Keysw_notlist == Kcurr)[0].tolist()
+    StID_curr    = [StimID_all[i1] for i1 in kindx]
+    StimID_curr  = StID_curr[0].split('_')[0]
 
-## Save the current subject raw file
-rawout_title = datacurr.split('.')
-rawout_name  = 'sub-'+rawout_title[0] + '.fif'
-RawIn.save(saveeeg_dir+rawout_name)
+    oindx = np.where(Onset_stim == StimID_curr)[0].tolist()  # adding onset of adverbs and adjectives to dict
+    Onset_adj = Onset_adjst[oindx]
+    Onset_adv = Onset_advst[oindx]
+
+    Tcurr        = [Trigall[i] for i in kindx]
+    AdjAdv_curr  = [IsAdjAdv[i2] for i2 in kindx]
+    AdjAdv_words = [AdjAdv_wd[i3] for i3 in kindx]
+    Filler_curr  = [IsFiller_all[i4] for i4 in kindx]
+    Keyword_curr  = [Keysw[i5] for i5 in kindx]
+    res   = dict({StimID_curr: [Keyword_curr, Tcurr, AdjAdv_curr, AdjAdv_words, Filler_curr,
+                                [Onset_adj.values[0].tolist(), Onset_adv.values[0].tolist()]]})
+    events_dict = {**events_dict, **res}   ## Could be used as a mapping
+
+## Create a mapping for the events to annotations procedure
+events_mapping = dict()
+Trig_askey = reftrig_info["Triggers"]
+Kwords_all = reftrig_info["Keywords"].tolist()
+
+for trigix in range(0, len(Trig_askey)):
+    Trgcurr  = Trig_askey[trigix]
+    res1     = dict({Trgcurr: Kwords_all[trigix]})
+    events_mapping = {**events_mapping, **res1}
 
 # Need a call of function to create the events.tsv file for the current participant.
 # note that this file should be saved with the dataset (.fif)
-eventbids = create_bidsevents(markers_df, save_currsuj_path, datacurr)
+eventbids, evt_title = create_bidsevents(markers_df, save_sessionpath, datacurr)
+eventsall = eventbids.values
+annots_from_events = mne.annotations_from_events(events = E, event_desc=events_mapping, sfreq=RawIn.info['sfreq'], orig_time=RawIn.info['meas_date'])
+
+# Store any annotations already present concerning empty data intervals ('BAD_ACQ_SKIP")
+annot_orig = RawIn.annotations
+RawIn.set_annotations(annots_from_events + annot_orig)
+
+## Save the current subject raw file
+rawout_title = datacurr.split('.')
+rawout_title2 = rawout_title[0].split('_')
+if len(rawout_title2[0]) ==1:
+    rawout_corr = '0'+rawout_title2[0]
+else:
+    rawout_corr = rawout_title2[0]
+rawout_name  = 'sub-'+rawout_corr + '_' + session_dir + '_' + eeg_dir + '.fif'
+RawIn.save('/'.join([saveeeg_dir,rawout_name]), overwrite=TRUE)
 
 # Write dictionary to a json file
-jfilepath = save_currsuj_path
-jfilenom = 'sub-'+ datacurr[:-4] + '_events_dict.json'
+jfilepath = save_sessionpath + '/'
+jfilenom = 'sub-'+ rawout_corr + '_events_dict.json'
 json.dump(events_dict, open(jfilepath+jfilenom, 'w'))
 
 ## Write the markers_df dataframe to an excel file.
