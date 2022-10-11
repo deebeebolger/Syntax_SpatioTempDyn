@@ -1,3 +1,5 @@
+""" Script to add triggers to data and create BIDS structure"""
+
 import mne
 import numpy as np
 from datetime import datetime
