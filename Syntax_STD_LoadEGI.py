@@ -157,8 +157,8 @@ def create_bidsevents(markersIn, savepath, sujname_curr):
     cols    = ["onsets", "duration", "sample", "keyword", "IsFiller", "Word_type", "trigger_codes"]
     eventsDF = pd.DataFrame(np.transpose(allists), columns = ["onsets", "duration", "sample", "keyword", "IsFiller", "Word_type", "trigger_codes"])
     print(eventsDF)
-    currnom = 'sub-' + sujname_curr[:-4] + '_events.tsv'
-    savepath_curr = savepath + currnom
+    currnom = '_'.join([sujname_curr,'events.tsv'])
+    savepath_curr = '/'.join([savepath, currnom])
     eventsDF.to_csv(savepath_curr, sep="\t")
 
     return eventsDF, currnom
@@ -372,18 +372,6 @@ for keyix in range(0,len(Keysw)):
                                 [Onset_adj.values[0].tolist(), Onset_adv.values[0].tolist()]]})
     events_dict = {**events_dict, **res}   ## Could be used as a mapping
 
-## Create a mapping for the events to annotations procedure
-# events_mapping = dict()
-# Trig_askey = reftrig_info["Triggers"]
-# Kwords_all = reftrig_info["Keywords"].tolist()
-# Wordkind   = reftrig_info["Isadj_adv"].tolist()
-#
-# for trigix in range(0, len(Trig_askey)):
-#     Trgcurr  = Trig_askey[trigix]
-#     kwordcurr = '/'.join([Kwords_all[trigix], Wordkind[trigix]])
-#     res1     = dict({Trgcurr: kwordcurr})
-#     events_mapping = {**events_mapping, **res1}
-
 events_mapping = dict()
 Trig_askey = markers_df_sort["trigger_code"].tolist()
 Kwords_all = markers_df_sort["keywords"].tolist()
@@ -398,7 +386,7 @@ for trigix in range(0, len(Trig_askey)):
 
 # Need a call of function to create the events.tsv file for the current participant.
 # note that this file should be saved with the dataset (.fif)
-eventbids, evt_title = create_bidsevents(markers_df, save_sessionpath, datacurr)
+eventbids, evt_title = create_bidsevents(markers_df_sort, save_sessionpath, '_'.join([newsub_dir, session_dir]))
 eventsall = eventbids.values
 annots_from_events = mne.annotations_from_events(events = E, event_desc=events_mapping, sfreq=RawIn.info['sfreq'], orig_time=RawIn.info['meas_date'])
 
@@ -409,7 +397,6 @@ RawIn.set_annotations(annots_from_events + annot_orig)
 raw_eeg = RawIn.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
 mne.viz.plot_raw(raw_eeg, duration=20, n_channels=20, title='Raw EEG Data', event_color='red',
                      remove_dc=True, block=True, show=True)
-
 
 ## Save the current subject raw file
 rawout_title = datacurr.split('.')
