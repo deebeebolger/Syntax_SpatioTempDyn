@@ -39,7 +39,18 @@ def viz_allchans(rawdata, vizdur, channum_viz):
 
 ###*************************LOAD IN THE FILE MANUALLY
 filename = browseFiles()
-dataIn = mne.io.read_raw_fif(filename, allow_maxshield=True, preload=True, verbose=None)
+dataIn = mne.read_epochs(filename, preload=True, verbose=None)
+event_id = dataIn.event_id
+dataIn.plot(block=True)
+
+
+###************************Load in continuous data manually***********************
+filename_cont = browseFiles()
+dataIn_cont = mne.io.read_raw_fif(filename_cont, preload=True, verbose=None)
+wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
+wind_nchans = 50         # Number of channels presented in each window.
+badchans = viz_allchans(dataIn_cont, wind_dur, wind_nchans)
+print('The channels pre-selected as bad are: {}'.format(badchans))
 
 ## ********************* Call of function viz_allchans() to plot all chans****************
 wind_dur    = 60         # Duration of time interval (in seconds) presented in each window.

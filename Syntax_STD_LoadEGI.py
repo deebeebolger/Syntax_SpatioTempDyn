@@ -104,6 +104,9 @@ def load_triginfo(pathin, fnamein, MarksIn):
     """Load in the excel resuming the trigger information"""
     triginfo_In = pd.read_excel(pathin + fnamein, sheet_name=0)
 
+    #triginfo_Inxl = pd.read_excel(pathin + fnamein)
+    #triginfo_In = triginfo_Inxl.parse('sheet1')
+
     keywords = triginfo_In["Keywords"].tolist()
     stimID   = triginfo_In["StimID"].tolist()
     triggers = triginfo_In["Triggers"].tolist()
@@ -172,9 +175,9 @@ print('The base directory is: {}\n' .format(basedir))
 fonsets = 'onset_times.xlsx'
 onset_path = '/'.join([basedir, fonsets])
 Onset_info = pd.read_excel(onset_path)
-Onset_stim = Onset_info['STIM']
-Onset_adjst = Onset_info['ADJ_START']
-Onset_advst = Onset_info['ADV_START']
+Onset_stim = Onset_info['STIM']         # Read in stim. names.
+Onset_adjst = Onset_info['ADJ_START']   # Read real onsets of adjectives.
+Onset_advst = Onset_info['ADV_START']   # Read real onsets of adverbs.
 
 #**** Set the path in which to save the data and the events list*******
 # These directories should be in the same folder from which you loaded the data.
@@ -193,8 +196,8 @@ if os.path.exists(saveEvents_path)==FALSE:
 else:
     print('Directory: {} and path: {} already exists.\n'.format(Eventdir, basedir))
 
-##****** CREATE THE STUDY DIRECTORY*****
-study_name = 'SyntaxDyn_hd'
+##****************************** CREATE THE STUDY DIRECTORY***********************************
+study_name = 'DynSyn_EEG_PC'
 sdir       = [basedir, study_name]
 studydir   =  '/'.join(sdir)
 
@@ -209,7 +212,7 @@ if os.path.exists(save_currsuj_path)==FALSE:
 else:
     print('Directory: {} and path: {} already exists.\n'.format(newsub_dir, save_currsuj_path))
 
-## Create a session directory within the newsub_dir directory
+##******************* Create a session directory within the newsub_dir directory***********************
 session_dir = 'ses-1'
 save_sessionpath = '/'.join([save_currsuj_path, session_dir])
 if os.path.exists(save_sessionpath)==FALSE:
@@ -231,10 +234,12 @@ trigXL          = trigxl_path_all.split('/')
 trigxl_path     = '/'.join(trigXL[:-1])+'/'
 trigxl_file     = 'TriggerCoding_SummaryJuly2022.xlsx'
 
+##****************************LOAD IN THE RAW EEG DATA *************************************************
 RawIn = mne.io.read_raw_egi(filename, channel_naming='E%d', verbose=None, preload=True)   # Load in raw EGI data in *.mff format
 sfreq = RawIn.info['sfreq']   # get the sampling frequency
 
-"""Extract the events.
+#**********************EXTRACT THE EVENTS FROM THE MFF FILE (XML FILE) AND ADD TO STIM CHANNEL************************
+"""Extract the events from the *.xml file (in the *.mff file).
 
 Parameters
 ----------
@@ -281,31 +286,57 @@ for xml in xml_events:
                   'chan': None,
                   }
         markers.append(marker)  # Contains information regarding all event markers (in dict format).
+
+##**********************CREATE A DICTIONNARY CONTAINING EVENT DATA************************
 events_tims = dict()
 for ev in code:
     trig_samp = list(c['start_sample'] for n,
                      c in enumerate(markers) if c['trigger_code'] == ev)
     events_tims.update({ev: trig_samp})    # Defines the onset times of each event in dict format.
 
-markers_df = pd.DataFrame.from_dict(markers)
+markers_df = pd.DataFrame.from_dict(markers)   # The dataframe presents trigger codes and onset sample.
 
 # Call of function to add trigger information to the dataframe.
 markers_df, markers_nda, reftrig_info = load_triginfo(trigxl_path, trigxl_file, markers_df)
 
-# Add the corrected markers to the raw object.
-E = mne.find_events(RawIn)
+## Add the onset information to the datafrales: markers_df and markers_nda.
+stim_ID = list(Onset_stim)       # Convert the list of stimuli names to a list.
+Onset_adj_list = list(Onset_adjst)
+Onset_adv_list = list(Onset_advst)
+
+Mdf = list(markers_df["stimID"]) # Extract the list of stimID
+# Find the indices of each of the stimID elems - need to change onset times of these.
+stimID_indices = []
+markersdf_new = markers_df.copy()
+
+for si, sindx in enumerate(stim_ID):
+    for mi, elem in enumerate(Mdf):
+        elems = elem.split("_")
+        curr_elem = elems[0]
+        print(curr_elem)
+        if sindx == curr_elem:
+            stimID_indices.append(mi)
+            curronset = markersdf_new.start[mi] + Onset_adj_list[si]/1000
+            currsamp  = curronset*sfreq
+            markersdf_new.start[mi] = curronset
+            markersdf_new.start_sample[mi] = currsamp
+markers_nda = markersdf_new.to_numpy()
+
+# Add the corrected markers to the stim channel of the raw object.
+E = np.array([[0]*3]*len(markers_nda))
+E[:,0] = markers_nda[:,3]
 E[:,2] = markers_nda[:,1]
 RawIn.add_events(E, 'STI 014', replace=True)
 
-# Create an events dictionary
+# Create the events dictionary
 events_dict  = dict()
 Keysw_notlist = reftrig_info["Keywords"]
 Keysw        = reftrig_info["Keywords"]
 Trigall      = reftrig_info["Triggers"].tolist()
 IsAdjAdv     = reftrig_info["Isadj_adv"].tolist()
 IsFiller_all = reftrig_info["Filler?"].tolist()
-AdjAdv_wd  = reftrig_info["Adj_Advb"].tolist()
-StimID_all = reftrig_info["StimID"]
+AdjAdv_wd    = reftrig_info["Adj_Advb"].tolist()
+StimID_all   = reftrig_info["StimID"]
 
 for keyix in range(0,len(Keysw)):
     Kcurr        = Keysw[keyix]
@@ -330,10 +361,12 @@ for keyix in range(0,len(Keysw)):
 events_mapping = dict()
 Trig_askey = reftrig_info["Triggers"]
 Kwords_all = reftrig_info["Keywords"].tolist()
+Wordkind   = reftrig_info["Isadj_adv"].tolist()
 
 for trigix in range(0, len(Trig_askey)):
     Trgcurr  = Trig_askey[trigix]
-    res1     = dict({Trgcurr: Kwords_all[trigix]})
+    kwordcurr = '/'.join([Kwords_all[trigix], Wordkind[trigix]])
+    res1     = dict({Trgcurr: kwordcurr})
     events_mapping = {**events_mapping, **res1}
 
 # Need a call of function to create the events.tsv file for the current participant.
@@ -345,6 +378,10 @@ annots_from_events = mne.annotations_from_events(events = E, event_desc=events_m
 # Store any annotations already present concerning empty data intervals ('BAD_ACQ_SKIP")
 annot_orig = RawIn.annotations
 RawIn.set_annotations(annots_from_events + annot_orig)
+
+raw_eeg = RawIn.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
+mne.viz.plot_raw(raw_eeg, duration=10, n_channels=20, title='Raw EEG Data', event_color='red',
+                     remove_dc=True, block=True, show=True)
 
 ## Save the current subject raw file
 rawout_title = datacurr.split('.')
@@ -359,7 +396,7 @@ RawIn.save('/'.join([saveeeg_dir,rawout_name]), overwrite=TRUE)
 # Write dictionary to a json file
 jfilepath = save_sessionpath + '/'
 jfilenom = 'sub-'+ rawout_corr + '_events_dict.json'
-json.dump(events_dict, open(jfilepath+jfilenom, 'w'))
+json.dump(events_mapping, open(jfilepath+jfilenom, 'w'))
 
 ## Write the markers_df dataframe to an excel file.
 savefname1 = datacurr[:-4]  +'_EventsList.xlsx' # Change to whatever naming system you want.
