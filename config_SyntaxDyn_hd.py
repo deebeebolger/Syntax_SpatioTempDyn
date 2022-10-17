@@ -13,7 +13,7 @@ bids_root  =  '/'.join([study_root, study_name])    # Root directory
 deriv_root = '/'.join([bids_root, 'derivatives'])
 
 sessions = ['1']
-subjects = ['10']
+subjects = ['05']
 ch_types = ['eeg']
 data_type = 'eeg'
 

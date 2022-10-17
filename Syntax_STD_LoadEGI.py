@@ -305,10 +305,12 @@ Onset_adj_list = list(Onset_adjst)
 Onset_adv_list = list(Onset_advst)
 
 Mdf = list(markers_df["stimID"]) # Extract the list of stimID
+
 # Find the indices of each of the stimID elems - need to change onset times of these.
 stimID_indices = []
-markersdf_new = markers_df.copy()
-
+markers_add    = []
+dfadder        = []
+M = []
 for si, sindx in enumerate(stim_ID):
     for mi, elem in enumerate(Mdf):
         elems = elem.split("_")
@@ -316,16 +318,29 @@ for si, sindx in enumerate(stim_ID):
         print(curr_elem)
         if sindx == curr_elem:
             stimID_indices.append(mi)
-            curronset = markersdf_new.start[mi] + Onset_adj_list[si]/1000
+            curronset = markers_df.start[mi] + Onset_adj_list[si]/1000
             currsamp  = curronset*sfreq
-            markersdf_new.start[mi] = curronset
-            markersdf_new.start_sample[mi] = currsamp
-markers_nda = markersdf_new.to_numpy()
+            newtrig  = markers_df.trigger_code[mi] + 1000
+            newkeyw  = '_'.join([markers_df.keywords[mi], '_CW'])
+            print(newtrig)
+            M = list(markers_df.loc[mi])
+            M[2] = curronset
+            M[3] = currsamp
+            M[1] = newtrig
+            M[6] = newkeyw
+            markers_add.append(M)
+
+cols = markers_df.columns
+Markers2Add = pd.DataFrame(markers_add, columns = list(cols))
+MarkersDF = markers_df.append(Markers2Add)
+markers_df_sort = MarkersDF.sort_values(by='start')
+markers_ndav2   = markers_df_sort.to_numpy()
+MarkersDict = markers_df_sort.to_dict()
 
 # Add the corrected markers to the stim channel of the raw object.
-E = np.array([[0]*3]*len(markers_nda))
-E[:,0] = markers_nda[:,3]
-E[:,2] = markers_nda[:,1]
+E = np.array([[0]*3]*len(markers_ndav2))
+E[:,0] = markers_ndav2[:,3]
+E[:,2] = markers_ndav2[:,1]
 RawIn.add_events(E, 'STI 014', replace=True)
 
 # Create the events dictionary
@@ -358,15 +373,27 @@ for keyix in range(0,len(Keysw)):
     events_dict = {**events_dict, **res}   ## Could be used as a mapping
 
 ## Create a mapping for the events to annotations procedure
+# events_mapping = dict()
+# Trig_askey = reftrig_info["Triggers"]
+# Kwords_all = reftrig_info["Keywords"].tolist()
+# Wordkind   = reftrig_info["Isadj_adv"].tolist()
+#
+# for trigix in range(0, len(Trig_askey)):
+#     Trgcurr  = Trig_askey[trigix]
+#     kwordcurr = '/'.join([Kwords_all[trigix], Wordkind[trigix]])
+#     res1     = dict({Trgcurr: kwordcurr})
+#     events_mapping = {**events_mapping, **res1}
+
 events_mapping = dict()
-Trig_askey = reftrig_info["Triggers"]
-Kwords_all = reftrig_info["Keywords"].tolist()
-Wordkind   = reftrig_info["Isadj_adv"].tolist()
+Trig_askey = markers_df_sort["trigger_code"].tolist()
+Kwords_all = markers_df_sort["keywords"].tolist()
+Wordkind   = markers_df_sort["AdjAdv"].tolist()
 
 for trigix in range(0, len(Trig_askey)):
-    Trgcurr  = Trig_askey[trigix]
-    kwordcurr = '/'.join([Kwords_all[trigix], Wordkind[trigix]])
-    res1     = dict({Trgcurr: kwordcurr})
+
+    Trgcurr = Trig_askey[trigix]
+    kwordcurr = Kwords_all[trigix]
+    res1 = dict({Trgcurr: kwordcurr})
     events_mapping = {**events_mapping, **res1}
 
 # Need a call of function to create the events.tsv file for the current participant.
@@ -380,8 +407,9 @@ annot_orig = RawIn.annotations
 RawIn.set_annotations(annots_from_events + annot_orig)
 
 raw_eeg = RawIn.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
-mne.viz.plot_raw(raw_eeg, duration=10, n_channels=20, title='Raw EEG Data', event_color='red',
+mne.viz.plot_raw(raw_eeg, duration=20, n_channels=20, title='Raw EEG Data', event_color='red',
                      remove_dc=True, block=True, show=True)
+
 
 ## Save the current subject raw file
 rawout_title = datacurr.split('.')
