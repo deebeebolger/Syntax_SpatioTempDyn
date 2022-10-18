@@ -5,6 +5,7 @@ import mne
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+from autoreject import Ransac
 
 from meegkit import dss
 from meegkit.utils import create_line_data, unfold
@@ -64,7 +65,7 @@ def _dolowpass(rawdata, sfreq_aim, chnoms_all, chnoms):
     sfreq_curr = rawdata.info["sfreq"]
     decim = np.round(sfreq_curr / sfreq_aim).astype(int)
     sfreq_new = sfreq_curr / decim
-    freq_lowpass = sfreq_new / 3        # Lowpass filtering at the 0.33 of the desired sample rate.
+    freq_lowpass = sfreq_new / 6        # Lowpass filtering at the 0.33 of the desired sample rate.
     print('The low-pass frequency is {} Hz'.format(freq_lowpass))
 
     chindx          = [chnoms_all.index(ic) for ic in chnoms]                                                       # Find the indices of the 'eeg' channels.
@@ -173,7 +174,6 @@ fullpath_bids = os.path.join(bids_suj, currf[0])
 RawIn         = mne.io.read_raw_fif(fullpath_bids, allow_maxshield=True, preload=True, verbose=None)
 RawIn.pick_types(eeg=True, stim=True).load_data()
 
-
 #%% ***** Set up an MNE Report (HTML file) ***********************
 report_fname = '.'.join([currf[0][:-4], 'html'])
 report_path  = os.path.join('MNE_Reports_html', report_fname)
@@ -187,6 +187,7 @@ ch_names_all = RawIn.ch_names
 ch_names   = [idx for idx in ch_names_all if idx.startswith("E")]
 misc_names = [idx1 for idx1 in ch_names_all if idx1.startswith("D")]
 
+RawIn.drop_channels(ch_names_all[256])
 RawIn.set_channel_types(dict.fromkeys(ch_names, 'eeg'))  # Set the ch_names to 'eeg' type.
 RawIn.set_channel_types(dict.fromkeys(misc_names, 'misc'))  # Set the trig channel type to 'misc'
 print('The eeg scalp channels are as follows: \n')
@@ -194,8 +195,7 @@ print(RawIn.copy().pick_types(meg=False, eeg=True).ch_names)
 print('The trig channels are as follows: \n')
 print(RawIn.copy().pick_types(meg=False, misc=True).ch_names)
 
-
-
+sfreq = RawIn.info['sfreq']
 time_secs = RawIn.times                           # Extract the time vector in seconds
 hpfilt = RawIn.info['highpass']
 print('High-pass filter cutoff: ', hpfilt, 'Hz')  # Print high-frequency cut-off frequency to screen.
@@ -205,46 +205,94 @@ print('Sampling frequency of current dataset: ', RawIn.info['sfreq'], 'Hz', '\n'
 print('The current dataset has {} time samples and {} channels \n'.format(RawIn.n_times, len(ch_names)))
 print('The duration of the current dataset is: {}seconds'.format(time_secs[-1]))
 
+
+
 ### ************* Set the electrode montage for the current data ************************
 """Here using GSN-HydroCel-257 montage. 
    Visualizing the montage in 2D.
    Assign montage to raw object (rawIn).
 """
 montage_all = mne.channels.get_builtin_montages()
-montindx = montage_all.index('GSN-HydroCel-257')
+montindx = montage_all.index('GSN-HydroCel-256')
 montage = mne.channels.make_standard_montage(montage_all[montindx])
-montage.rename_channels({'Cz': 'E257'})  # Changing channel 'Cz' in montage to 'E257.
-mne.viz.plot_montage(montage)  # Visualize montage.
+montage_fig = mne.viz.plot_montage(montage, show=False)  # Visualize montage.
 RawIn.set_montage(montage)  # Assign the montage to the rawIn object.
+data_report.add_figure(fig=montage_fig, title="GSN-HydroCel-257 Montage", caption= '256 channels')
+
+#%% ************** Find breaks in the continuous data **********************************
+
+break_annots = mne.preprocessing.annotate_break(RawIn, min_break_duration=20, t_start_after_previous=5, t_stop_before_next=5)
+RawIn.set_annotations(RawIn.annotations + break_annots)
 
 ##*********************** Carry out low-pass and high-pass filtering ******************
-  # Call of function to carry out low-pass filtering.
-new_sfreq = 250                                                     # Define the sampling frequency (Hz) desired after downsampling.
-rawfilt_LP = _dolowpass(rawIn, new_sfreq, ch_names_all, ch_names)
-hplim = .1                                                          # High-pass filter cutoff, .1Hz
-rawfilt_HP = _dohighpass(rawfilt_LP, hplim, ch_names_all, ch_names) # Call of function to carry out high-pass filtering.
+hplim = .05                                                    # High-pass filter cutoff, .1Hz
+Rawfilt_HP, filthp_fig, filthp_params = _dohighpass(RawIn, hplim, ch_names_all, ch_names) # Call of function to carry out high-pass filtering.
+
+# Call of function to carry out low-pass filtering.
+new_sfreq  = 250                                               # Define the sampling frequency (Hz) desired after downsampling (to be carried out after epoching)
+Rawfilt_LP, filtlp_fig, filtlp_params = _dolowpass(Rawfilt_HP, new_sfreq, ch_names_all, ch_names)
+
+data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
+data_report.add_figure(fig=filthp_fig, title="High-pass filter characteristics")
+data_report.add_figure(fig=filtlp_fig, title="Low-pass filter characteristics")
+
+
+#%% *************** Get a summary of EOG artifacts in the data and save to the mne report. *****************************
+eogs = mne.preprocessing.create_eog_epochs(Rawfilt_LP, ch_name=['E60','E19'], picks='eeg', reject_by_annotation=True).average()
+eogs.apply_baseline(baseline=(None, -0.2))
+fig_eog = eogs.plot_joint()
+data_report.add_figure(fig=fig_eog, title='Extracted EOG Artifacts')
+data_report.save(fname = report_path, overwrite=True)
+
+Events = mne.find_events(Rawfilt_LP)
+mne.viz.plot_raw(Rawfilt_LP, events=Events, duration=20, n_channels=20, title='Select channels with line noise', event_color='red',
+                     remove_dc=True, block=False, show=True)
 
 ### ********************* Detecting Bad Electrodes *************************
 
-lensig = rawfilt_HP.last_samp
-round(len(rawfilt_HP)/10)
+lensig = Rawfilt_LP.last_samp
+round(len(Rawfilt_LP)/10)
 pow2 = findNextPowerOf2(int(lensig/2))
 chanindx = [ch_names_all.index(ic) for ic in ch_names]
 print('Signal length is {} and the nearest power of two is {}'.format(lensig, pow2))
-plotSpectrum(rawfilt_HP, pow2, chanindx)
+plotSpectrum(Rawfilt_LP, pow2, chanindx)
 print('****plotted spectrum')
 
-### ******* Apply the zpline function (from the meegkit package) to remove line noise *********####
 
-## Call of function here in which the zapline function is run.
-dss.dss_line(rawfilt_HP, 50, new_sfreq, nfft=500)
+""" Apply the zapline function (from the meegkit package) to remove line noise
+    Call of function here in which the zapline function is run.
+"""
+Events = mne.find_events(Rawfilt_LP)
+mne.viz.plot_raw(RawIn, events=Events, duration=20, n_channels=20, title='Select channels with line noise', event_color='red',
+                     remove_dc=True, block=False, show=True)
+badchans_line = Rawfilt_LP.info['bads']
+chans_indx = mne.pick_channels(ch_names, include= badchans_line)             #Extract the indices of the channels of interest
+Rdata1, times = Rawfilt_LP[chans_indx, 0:len(time_secs)]
+Rdata1_tp = np.transpose(Rdata1)
+Rawdss, artif = dss.dss_line_iter(Rdata1_tp, 50, sfreq, nfft=1000, show=True)
+Rawdss_tp = np.transpose(Rawdss)
+artif_tp  = np.transpose(artif)
+
+plt.plot(time_secs, Rdata1[10,:])
+plt.plot(time_secs, Rawdss_tp[10,:])
+plt.plot(time_secs, artif_tp[10,:])
+
+for chindx, chs in enumerate(chans_indx):
+    Rawfilt_LP[chs, :] = np.repeat(0, len(time_secs))
+    Rawfilt_LP[chs, :] = Rawdss_tp[chindx, :]
+
+
+
+
 
 ## ********************* Call of function viz_allchans() to plot all chans
 wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
 wind_nchans = 50         # Number of channels presented in each window.
-badchans = viz_allchans(rawfilt_HP, wind_dur, wind_nchans)
+badchans = viz_allchans(Rawfilt_LP, wind_dur, wind_nchans)
 print('The channels pre-selected as bad are: {}'.format(badchans))
+
+
 
 suffix = 'bandpass'
 path2save, fsave_name = create_savepath(filename,suffix)
-rawfilt_HP.save(path2save + fsave_name)
+Rawfilt_LP.save(path2save + fsave_name)
