@@ -121,7 +121,8 @@ def create_savepath(fstring, sfix):
 """****************************** LOAD IN CONTINUOUS DATA IN .FIF FORMAT################################"""
 study_name = 'DynSyn_EEG_PC'
 study_folder = '_'.join(['Project', study_name])
-study_root =  os.path.join("Users", "bolger", "Documents", "work", "Projects", study_folder)
+study_root =  os.path.join(" ", "Users", "bolger", "Documents", "work", "Projects", study_folder)
+study_root = study_root[1:]
 bids_root  =  os.path.join(study_root, study_name)    # BIDS root directory
 
 sessions = ['1']
@@ -129,7 +130,8 @@ subjects = ['05']
 ch_types = ['eeg']
 data_type = ('eeg')
 
-## ************* Define the directory in which to search for the raw.fif data *****************
+"""************* Define the directory in which to search for the raw.fif data *****************"""
+
 subdir = '-'.join(['sub',subjects[0]])
 sesdir = '-'.join(['ses', sessions[0]])
 bids_suj = os.path.join(bids_root, subdir, sesdir, data_type)     # The directory from which to load the current subject dataset.
@@ -138,7 +140,10 @@ if os.path.exists(bids_suj)==FALSE:
 else:
     print('Loading raw file from subject directory: {}\n'.format(bids_suj))
 
-## *********** If the "derivatives" directory does not already exist, create one
+"""  If the "derivatives" directory does not already exist, create one
+     The processed files are saved in the derivatives folder. 
+     For each subject, a directory is created. 
+ """
 deriv_root = os.path.join(bids_root, 'derivatives')
 if os.path.exists(deriv_root)==FALSE:
     os.mkdir(deriv_root)
@@ -152,45 +157,65 @@ if os.path.exists(deriv_suj_root)==FALSE:
 else:
     print('Directory: {} and path: {} already exists.\n'.format(subdir, deriv_suj_root))
 
+#%% ****************** LOAD IN THE CURRENT SUBJECT RAW FILE ************************** %%#
+script_path_all = os.path.abspath('DynSynEEGPC_preprocessing.py')
+script_exl      = script_path_all.split('/')
+script_exl_path = '/'.join(script_exl[:-1])
+htmlrep_path    = os.path.join(script_exl_path, 'MNE_Reports_html')
+if os.path.exists(htmlrep_path)==FALSE:
+    os.mkdir((htmlrep_path))
+else:
+    print('Directory: {} and path: {} already exists.\n'.format('MNE_Reports_html', htmlrep_path))
+
+x = os.listdir(bids_suj+'/')
+currf         = [ix for ix in x if ix.endswith('fif')]
+fullpath_bids = os.path.join(bids_suj, currf[0])
+RawIn         = mne.io.read_raw_fif(fullpath_bids, allow_maxshield=True, preload=True, verbose=None)
+RawIn.pick_types(eeg=True, stim=True).load_data()
 
 
+#%% ***** Set up an MNE Report (HTML file) ***********************
+report_fname = '.'.join([currf[0][:-4], 'html'])
+report_path  = os.path.join('MNE_Reports_html', report_fname)
+data_report = mne.Report(title=currf[0], subject=subdir)
+data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
+data_report.save(fname = report_path, overwrite=True)
 
-
-# Extract basic information from the rawIn.info
+#%% ******************* Extract basic information from the rawIn.info
 # Need to separate the channel names from the trigger channel names, which begin with "D"
-ch_names_all = rawIn.ch_names
-ch_names = [idx for idx in ch_names_all if idx.startswith("E")]
+ch_names_all = RawIn.ch_names
+ch_names   = [idx for idx in ch_names_all if idx.startswith("E")]
 misc_names = [idx1 for idx1 in ch_names_all if idx1.startswith("D")]
 
-rawIn.set_channel_types(dict.fromkeys(ch_names, 'eeg'))  # Set the ch_names to 'eeg' type.
-rawIn.set_channel_types(dict.fromkeys(misc_names, 'misc'))  # Set the trig channel type to 'misc'
+RawIn.set_channel_types(dict.fromkeys(ch_names, 'eeg'))  # Set the ch_names to 'eeg' type.
+RawIn.set_channel_types(dict.fromkeys(misc_names, 'misc'))  # Set the trig channel type to 'misc'
 print('The eeg scalp channels are as follows: \n')
-print(rawIn.copy().pick_types(meg=False, eeg=True).ch_names)
+print(RawIn.copy().pick_types(meg=False, eeg=True).ch_names)
 print('The trig channels are as follows: \n')
-print(rawIn.copy().pick_types(meg=False, misc=True).ch_names)
-hpfilt = rawIn.info['highpass']
+print(RawIn.copy().pick_types(meg=False, misc=True).ch_names)
+
+
+
+time_secs = RawIn.times                           # Extract the time vector in seconds
+hpfilt = RawIn.info['highpass']
 print('High-pass filter cutoff: ', hpfilt, 'Hz')  # Print high-frequency cut-off frequency to screen.
-lowfilt = rawIn.info['lowpass']
-print('Low-pass filter cutoff: ', lowfilt,'Hz')  # Print low-frequency cut-off frequency to screen.
-
-# Exract the time vector in seconds
-time_secs = rawIn.times
-
-print('Sampling frequency of current dataset: ', rawIn.info['sfreq'], 'Hz', '\n')
-print('The current dataset has {} time samples and {} channels \n'.format(rawIn.n_times, len(ch_names)))
+lowfilt = RawIn.info['lowpass']
+print('Low-pass filter cutoff: ', lowfilt,'Hz')   # Print low-frequency cut-off frequency to screen.
+print('Sampling frequency of current dataset: ', RawIn.info['sfreq'], 'Hz', '\n')
+print('The current dataset has {} time samples and {} channels \n'.format(RawIn.n_times, len(ch_names)))
 print('The duration of the current dataset is: {}seconds'.format(time_secs[-1]))
 
 ### ************* Set the electrode montage for the current data ************************
 """Here using GSN-HydroCel-257 montage. 
    Visualizing the montage in 2D.
    Assign montage to raw object (rawIn).
-   """
+"""
 montage_all = mne.channels.get_builtin_montages()
 montindx = montage_all.index('GSN-HydroCel-257')
 montage = mne.channels.make_standard_montage(montage_all[montindx])
 montage.rename_channels({'Cz': 'E257'})  # Changing channel 'Cz' in montage to 'E257.
 mne.viz.plot_montage(montage)  # Visualize montage.
-rawIn.set_montage(montage)  # Assign the montage to the rawIn object.
+RawIn.set_montage(montage)  # Assign the montage to the rawIn object.
 
 ##*********************** Carry out low-pass and high-pass filtering ******************
   # Call of function to carry out low-pass filtering.
