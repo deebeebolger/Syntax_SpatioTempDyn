@@ -315,20 +315,36 @@ for si, sindx in enumerate(stim_ID):
     for mi, elem in enumerate(Mdf):
         elems = elem.split("_")
         curr_elem = elems[0]
-        print(curr_elem)
         if sindx == curr_elem:
-            stimID_indices.append(mi)
-            curronset = markers_df.start[mi] + Onset_adj_list[si]/1000
-            currsamp  = curronset*sfreq
-            newtrig  = markers_df.trigger_code[mi] + 1000
-            newkeyw  = '_'.join([markers_df.keywords[mi], '_CW'])
-            print(newtrig)
-            M = list(markers_df.loc[mi])
-            M[2] = curronset
-            M[3] = currsamp
-            M[1] = newtrig
-            M[6] = newkeyw
-            markers_add.append(M)
+            if elems[1]=='adj':
+                stimID_indices.append(mi)
+                curronset = markers_df.start[mi] + Onset_adj_list[si]/1000
+                currsamp  = curronset*sfreq
+                newtrig  = markers_df.trigger_code[mi] + 1000
+                newkeyw  = '_'.join([markers_df.keywords[mi], '_CW'])
+                newkeyw2 = '/'.join([newkeyw, 'Adj'])
+                print(newkeyw2)
+                M = list(markers_df.loc[mi])
+                M[2] = curronset
+                M[3] = currsamp
+                M[1] = newtrig
+                M[6] = newkeyw2
+                markers_add.append(M)
+            elif elems[1] == 'adv':
+                stimID_indices.append(mi)
+                curronset = markers_df.start[mi] + Onset_adj_list[si] / 1000
+                currsamp = curronset * sfreq
+                newtrig = markers_df.trigger_code[mi] + 1000
+                newkeyw = '_'.join([markers_df.keywords[mi], '_CW'])
+                newkeyw2 = '/'.join([newkeyw, 'Adv'])
+                print(newkeyw2)
+                M = list(markers_df.loc[mi])
+                M[2] = curronset
+                M[3] = currsamp
+                M[1] = newtrig
+                M[6] = newkeyw2
+                markers_add.append(M)
+
 
 cols = markers_df.columns
 Markers2Add = pd.DataFrame(markers_add, columns = list(cols))
@@ -393,10 +409,8 @@ annots_from_events = mne.annotations_from_events(events = E, event_desc=events_m
 # Store any annotations already present concerning empty data intervals ('BAD_ACQ_SKIP")
 annot_orig = RawIn.annotations
 RawIn.set_annotations(annots_from_events + annot_orig)
-
 raw_eeg = RawIn.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
-mne.viz.plot_raw(raw_eeg, duration=20, n_channels=20, title='Raw EEG Data', event_color='red',
-                     remove_dc=True, block=True, show=True)
+
 
 ## Save the current subject raw file
 rawout_title = datacurr.split('.')

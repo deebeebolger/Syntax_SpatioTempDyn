@@ -109,15 +109,30 @@ def plotSpectrum(rawdata, powtwoL, chindx):
     ax.set(title='Welch PSD of band-pass filtered data', xlabel='Frequency (Hz)', ylabel='Power Spectral Density (dB)')
     plt.show()
 
-def create_savepath(fstring, sfix):
-    fs = fstring.split('/')
-    datacurr = fs[-1]
-    data2save = datacurr.split('.')
-    rawout_name = data2save[0] + '_' + sfix + '.fif'
-    fs1 = fs[0:-1]
-    savepath = '/'.join(fs1)
-    savepath = savepath + '/'
-    return savepath, rawout_name
+
+# def zapline_apply():
+#     """ Apply the zapline function (from the meegkit package) to remove line noise
+#         Call of function here in which the zapline function is run.
+#     """
+#     Events = mne.find_events(Rawfilt_LP)
+#     mne.viz.plot_raw(RawIn, events=Events, duration=20, n_channels=20, title='Select channels with line noise',
+#                      event_color='red',
+#                      remove_dc=True, block=False, show=True)
+#     badchans_line = Rawfilt_LP.info['bads']
+#     chans_indx = mne.pick_channels(ch_names, include=badchans_line)  # Extract the indices of the channels of interest
+#     Rdata1, times = Rawfilt_LP[chans_indx, 0:len(time_secs)]
+#     Rdata1_tp = np.transpose(Rdata1)
+#     Rawdss, artif = dss.dss_line_iter(Rdata1_tp, 50, sfreq, nfft=1000, show=True)
+#     Rawdss_tp = np.transpose(Rawdss)
+#     artif_tp = np.transpose(artif)
+#
+#     plt.plot(time_secs, Rdata1[10, :])
+#     plt.plot(time_secs, Rawdss_tp[10, :])
+#     plt.plot(time_secs, artif_tp[10, :])
+#
+#     for chindx, chs in enumerate(chans_indx):
+#         Rawfilt_LP[chs, :] = np.repeat(0, len(time_secs))
+#         Rawfilt_LP[chs, :] = Rawdss_tp[chindx, :]
 
 """****************************** LOAD IN CONTINUOUS DATA IN .FIF FORMAT################################"""
 study_name = 'DynSyn_EEG_PC'
@@ -135,6 +150,7 @@ data_type = ('eeg')
 
 subdir = '-'.join(['sub',subjects[0]])
 sesdir = '-'.join(['ses', sessions[0]])
+sujname = '_'.join([subdir, sesdir])
 bids_suj = os.path.join(bids_root, subdir, sesdir, data_type)     # The directory from which to load the current subject dataset.
 if os.path.exists(bids_suj)==FALSE:
     raise Exception("The necessary directory for the current subject does not exist")
@@ -206,9 +222,8 @@ print('The current dataset has {} time samples and {} channels \n'.format(RawIn.
 print('The duration of the current dataset is: {}seconds'.format(time_secs[-1]))
 
 
-
 ### ************* Set the electrode montage for the current data ************************
-"""Here using GSN-HydroCel-257 montage. 
+"""Here using GSN-HydroCel-256 montage. 
    Visualizing the montage in 2D.
    Assign montage to raw object (rawIn).
 """
@@ -244,11 +259,23 @@ fig_eog = eogs.plot_joint()
 data_report.add_figure(fig=fig_eog, title='Extracted EOG Artifacts')
 data_report.save(fname = report_path, overwrite=True)
 
-Events = mne.find_events(Rawfilt_LP)
-mne.viz.plot_raw(Rawfilt_LP, events=Events, duration=20, n_channels=20, title='Select channels with line noise', event_color='red',
-                     remove_dc=True, block=False, show=True)
+#%% ***************** Carry out manual detection of noisy electrodes ************************
+"""The arrow keys (up/down/left/right) can typically be used to navigate between channels and time ranges, 
+    but this depends on the backend matplotlib is configured to use (e.g., mpl.use(‘TkAgg’) should work). 
+    The scaling can be adjusted with - and + (or =) keys. The viewport dimensions can be adjusted with page 
+    up/page down and home/end keys. Full screen mode can be to toggled with f11 key. To mark or un-mark a channel 
+    as bad, click on the rather flat segments of a channel’s time series. The changes will be reflected immediately 
+    in the raw object’s raw.info['bads'] entry.
+"""
 
-### ********************* Detecting Bad Electrodes *************************
+Events = mne.find_events(Rawfilt_LP)
+mne.viz.plot_raw(Rawfilt_LP, events=Events, duration=20, n_channels=20, title='Select noisy channels', event_color='red',
+                     remove_dc=True, block=True, show=True)
+
+### ********************* Detecting Bad Electrodes *********************************************
+"""
+    Plot the power spectrum density (PSD) of all electrodes
+"""
 
 lensig = Rawfilt_LP.last_samp
 round(len(Rawfilt_LP)/10)
@@ -258,41 +285,27 @@ print('Signal length is {} and the nearest power of two is {}'.format(lensig, po
 plotSpectrum(Rawfilt_LP, pow2, chanindx)
 print('****plotted spectrum')
 
-
-""" Apply the zapline function (from the meegkit package) to remove line noise
-    Call of function here in which the zapline function is run.
-"""
-Events = mne.find_events(Rawfilt_LP)
-mne.viz.plot_raw(RawIn, events=Events, duration=20, n_channels=20, title='Select channels with line noise', event_color='red',
-                     remove_dc=True, block=False, show=True)
-badchans_line = Rawfilt_LP.info['bads']
-chans_indx = mne.pick_channels(ch_names, include= badchans_line)             #Extract the indices of the channels of interest
-Rdata1, times = Rawfilt_LP[chans_indx, 0:len(time_secs)]
-Rdata1_tp = np.transpose(Rdata1)
-Rawdss, artif = dss.dss_line_iter(Rdata1_tp, 50, sfreq, nfft=1000, show=True)
-Rawdss_tp = np.transpose(Rawdss)
-artif_tp  = np.transpose(artif)
-
-plt.plot(time_secs, Rdata1[10,:])
-plt.plot(time_secs, Rawdss_tp[10,:])
-plt.plot(time_secs, artif_tp[10,:])
-
-for chindx, chs in enumerate(chans_indx):
-    Rawfilt_LP[chs, :] = np.repeat(0, len(time_secs))
-    Rawfilt_LP[chs, :] = Rawdss_tp[chindx, :]
-
-
-
-
-
 ## ********************* Call of function viz_allchans() to plot all chans
 wind_dur    = 10         # Duration of time interval (in seconds) presented in each window.
 wind_nchans = 50         # Number of channels presented in each window.
 badchans = viz_allchans(Rawfilt_LP, wind_dur, wind_nchans)
 print('The channels pre-selected as bad are: {}'.format(badchans))
 
+##%%********************* Set the average reference as projector ******************************************
+"""
+    Setting the average reference as a projector will permit the recalculation of the projector if we mark other 
+    channels as "bad". 
+"""
+Rawfilt_LP.set_eeg_reference('average', projection=True)    # Create the average reference as a projector.
+
+##%% *********************Save the filtered data with bad channels marked ********************
+suffix = 'proc-filt_raw.fif'
+fsave_name = '_'.join([sujname, suffix])
+path2save  = os.path.join(deriv_suj_root, fsave_name)
+Rawfilt_LP.save(path2save)
+
+##%% ******************* Carry out Segmentation of the Continuous Data ************************
+
+events = mne.find_events(Rawfilt_LP)
 
 
-suffix = 'bandpass'
-path2save, fsave_name = create_savepath(filename,suffix)
-Rawfilt_LP.save(path2save + fsave_name)
