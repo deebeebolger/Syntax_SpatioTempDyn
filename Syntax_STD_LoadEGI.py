@@ -411,7 +411,6 @@ annot_orig = RawIn.annotations
 RawIn.set_annotations(annots_from_events + annot_orig)
 raw_eeg = RawIn.copy().pick_types(meg=False, eeg=True)  # Only show the EEG channels.
 
-
 ## Save the current subject raw file
 rawout_title = datacurr.split('.')
 rawout_title2 = rawout_title[0].split('_')

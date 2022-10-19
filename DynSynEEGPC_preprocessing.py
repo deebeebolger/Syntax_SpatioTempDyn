@@ -5,6 +5,7 @@ import mne
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import json
 from autoreject import Ransac
 
 from meegkit import dss
@@ -305,7 +306,27 @@ path2save  = os.path.join(deriv_suj_root, fsave_name)
 Rawfilt_LP.save(path2save)
 
 ##%% ******************* Carry out Segmentation of the Continuous Data ************************
+"""
+    Note: the maximum difference between first word in sentence and critical word is 1175ms.
+    So define tmin as ((1175+200)*-1)/1000 and tmax as 1.0s
+
+"""
 
 events = mne.find_events(Rawfilt_LP)
+suj_edict   = '_'.join([sujname.split('_')[0], 'events_dict.json'])
+edict_path  = os.path.join(bids_root, subdir, sesdir, suj_edict)
+edict_f     = open(edict_path)
+events_dict = json.load(edict_f)
+max_dist = 1175/1000
+tmin = (max_dist+0.2)*-1
+tmax = 1.0
+
+events_from_annots = mne.events_from_annotations(Rawfilt_LP)
+
+events_dict2 = {int(k1): v for k1, v in events_dict.items()}
+elems2delete = (1, 0, 2, 3, 4, 5, 6, 7, 8, 9)
+for dki in elems2delete:
+    events_dict2.pop(dki)
+Epoch_data = mne.Epochs(Rawfilt_LP, events, event_id=events_dict2, tmin= tmin, tmax=tmax, baseline=(None, None), picks = chanindx, reject_by_annotation=False)
 
 
