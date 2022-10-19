@@ -303,7 +303,7 @@ Rawfilt_LP.set_eeg_reference('average', projection=True)    # Create the average
 suffix = 'proc-filt_raw.fif'
 fsave_name = '_'.join([sujname, suffix])
 path2save  = os.path.join(deriv_suj_root, fsave_name)
-Rawfilt_LP.save(path2save)
+Rawfilt_LP.save(path2save, overwrite=True)
 
 ##%% ******************* Carry out Segmentation of the Continuous Data ************************
 """
@@ -322,11 +322,15 @@ tmin = (max_dist+0.2)*-1
 tmax = 1.0
 
 events_from_annots = mne.events_from_annotations(Rawfilt_LP)
-
+events_ID = events_from_annots[1]
 events_dict2 = {int(k1): v for k1, v in events_dict.items()}
 elems2delete = (1, 0, 2, 3, 4, 5, 6, 7, 8, 9)
 for dki in elems2delete:
     events_dict2.pop(dki)
-Epoch_data = mne.Epochs(Rawfilt_LP, events, event_id=events_dict2, tmin= tmin, tmax=tmax, baseline=(None, None), picks = chanindx, reject_by_annotation=False)
+Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmin, tmax=tmax, baseline=(None, None), picks = chanindx, reject_by_annotation=False, on_missing='warn')
+## Here need to baseline correct the data...based on onset of first word in sentence.
 
+Epoch_data.plot(block=True)
+evoked_adj = Epoch_data['Adj'].average()
+evoked_adv = Epoch_data['Adv'].average()
 
