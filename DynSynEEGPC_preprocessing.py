@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import json
 import pandas as pd
 import copy
-from autoreject import Ransac
+from autoreject import Ransac  # noqa
+from autoreject.utils import interpolate_bads
 
 from meegkit import dss
 from meegkit.utils import create_line_data, unfold
@@ -319,10 +320,13 @@ Rawfilt_LP.save(path2save, overwrite=True)
 
 ##%% ******************* Carry out Segmentation of the Continuous Data ************************
 """
+    Carry out Segmentation of the Continuous Data
     Note: the maximum difference between first word in sentence and critical word for both adj and adv is 1268ms.
     So define tmin as ((1268+200)*-1)/1000 and tmax as 1.0s
     Then we baseline correct on an epoch-by-epoch basis based on the time of the initial word of the sentence.
-
+    To get the upper baseline limit corresponding to each stimulus, need to load in the following *.xlsx files:
+    - Subject-level events file generated in Syntax_STD_LoadEGI.py (sXX_EventsList.xlsx)
+    - onset_times.xlsx file with onset of sentence corresponding to each critical word.
 """
 
 currsuj_events = pd.read_excel(currevents_fullpath, sheet_name=0)
@@ -378,3 +382,30 @@ epadv_fig = EpochData_copy['Adv'].average().plot()
 data_report.add_figure(fig=epadj_fig, title='Butterfly plot of Adj Epochs with baseline correction', caption='Remaining bad electrodes are still visible')
 data_report.add_figure(fig=epadv_fig, title='Butterfly plot of Adv Epochs with baseline correction', caption='Remaining bad electrodes are still visible')
 data_report.save(fname = report_path, overwrite=True)
+
+suffix = 'epo.fif'
+fsave_name_ep1 = '_'.join([sujname, suffix])
+path2save_ep1  = os.path.join(deriv_suj_root, fsave_name_ep1)
+Epoch_data.save(path2save_ep1, overwrite=True)
+
+##%% ******************** Need to add functions to clean the epoched data *******************
+
+epoch_picks = mne.pick_types(Epoch_data.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
+ransac_curr = Ransac(verbose=True, picks=epoch_picks, n_jobs=1)
+EpochData_clean = ransac_curr.fit_transform((EpochData_copy))
+print('Bad channels detected by ransac are: {}'.format(ransac_curr.bad_chs_))
+
+## Try plotting a heat map to show the number of bad electrodes per trial.
+ch_names = [Epoch_data.ch_names[ii] for ii in ransac_curr.picks][0::30]
+fig, ax = plt.subplots(1, 1, figsize=(12, 12))
+ax.imshow(ransac_curr.bad_log, cmap='Reds',
+          interpolation='nearest')
+ax.grid(False)
+ax.set_xlabel('Sensors')
+ax.set_ylabel('Trials')
+plt.setp(ax, xticks=range(7, len(ransac_curr.picks), 10),
+         xticklabels=ch_names)
+plt.setp(ax.get_yticklabels(), rotation=0)
+plt.setp(ax.get_xticklabels(), rotation=90)
+ax.tick_params(axis=u'both', which=u'both', length=0)
+plt.show()
