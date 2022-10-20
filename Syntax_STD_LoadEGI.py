@@ -427,6 +427,6 @@ jfilenom = 'sub-'+ rawout_corr + '_events_dict.json'
 json.dump(events_mapping, open(jfilepath+jfilenom, 'w'))
 
 ## Write the markers_df dataframe to an excel file.
-savefname1 = datacurr[:-4]  +'_EventsList.xlsx' # Change to whatever naming system you want.
+savefname1 =  'sub-'+ rawout_corr +'_EventsList.xlsx' # Change to whatever naming system you want.
 with pd.ExcelWriter(saveEvents_path + savefname1) as writer:
     markers_df.to_excel(writer, sheet_name='sheet1', index=False)

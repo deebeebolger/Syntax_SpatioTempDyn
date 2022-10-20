@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import json
+import pandas as pd
 from autoreject import Ransac
 
 from meegkit import dss
@@ -175,6 +176,18 @@ if os.path.exists(deriv_suj_root)==FALSE:
 else:
     print('Directory: {} and path: {} already exists.\n'.format(subdir, deriv_suj_root))
 
+#%% ******** Define the path to the current subject events file and onset file ************************
+"""
+    This information will be required for baseline correction.
+"""
+currevents_path = os.path.join(study_root, 'EventFiles')
+currevents_f    = '_'.join([subdir, 'EventsList.xlsx'])
+currevents_fullpath = os.path.join(currevents_path, currevents_f)
+
+onsett_path = study_root
+onsett_f    = 'onset_times.xlsx'
+onsett_fullpath = os.path.join(onsett_path, onsett_f)
+
 #%% ****************** LOAD IN THE CURRENT SUBJECT RAW FILE ************************** %%#
 script_path_all = os.path.abspath('DynSynEEGPC_preprocessing.py')
 script_exl      = script_path_all.split('/')
@@ -196,7 +209,6 @@ report_fname = '.'.join([currf[0][:-4], 'html'])
 report_path  = os.path.join('MNE_Reports_html', report_fname)
 data_report = mne.Report(title=currf[0], subject=subdir)
 data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
-data_report.save(fname = report_path, overwrite=True)
 
 #%% ******************* Extract basic information from the rawIn.info
 # Need to separate the channel names from the trigger channel names, which begin with "D"
@@ -312,25 +324,53 @@ Rawfilt_LP.save(path2save, overwrite=True)
 
 """
 
+currsuj_events = pd.read_excel(currevents_fullpath, sheet_name=0)
+onset_times    = pd.read_excel(onsett_fullpath, sheet_name=0)
+keywords = currsuj_events['keywords'].tolist()
+stimIDs  = currsuj_events['stimID'].tolist()
+onsets_stim = onset_times['STIM'].tolist()
+onsets_start_adj = onset_times['ADJ_START'].tolist()
+onsets_start_adv = onset_times['ADV_START'].tolist()
+
 events = mne.find_events(Rawfilt_LP)
-suj_edict   = '_'.join([sujname.split('_')[0], 'events_dict.json'])
-edict_path  = os.path.join(bids_root, subdir, sesdir, suj_edict)
-edict_f     = open(edict_path)
-events_dict = json.load(edict_f)
+events_from_annots = mne.events_from_annotations(Rawfilt_LP)
+events_ID = events_from_annots[1]
+
 max_dist = 1175/1000
 tmin = (max_dist+0.2)*-1
 tmax = 1.0
-
-events_from_annots = mne.events_from_annotations(Rawfilt_LP)
-events_ID = events_from_annots[1]
-events_dict2 = {int(k1): v for k1, v in events_dict.items()}
-elems2delete = (1, 0, 2, 3, 4, 5, 6, 7, 8, 9)
-for dki in elems2delete:
-    events_dict2.pop(dki)
-Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmin, tmax=tmax, baseline=(None, None), picks = chanindx, reject_by_annotation=False, on_missing='warn')
+reject = {'eeg': 250e-6}
+Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmin, tmax=tmax, baseline=(None, None), picks = chanindx,
+                       reject_by_annotation=False, on_missing='ignore', preload=True)
 ## Here need to baseline correct the data...based on onset of first word in sentence.
 
 Epoch_data.plot(block=True)
+edata_adj = Epoch_data['Adj'].get_data()
+edata_adv = Epoch_data['Adv'].get_data()
+print('The shape of adjective epoched data is: {}'.format(edata_adj.shape))    # Shape is events X channel number X time
+print('The shape of adverb epoched data is: {}'.format(edata_adv.shape))
+events_list = Epoch_data.event_id
+conds_list  = events_list.keys()
+
+# baseline correct the adjective data
+for cindx, c in enumerate(conds_list):
+    if "Adj" in c:
+        print(c)
+        cparts = c.split('__')
+        ik = keywords.index(cparts[0])
+        curr_stimID = stimIDs[ik].split('_')
+        onidx = onsets_stim.index(curr_stimID[0])
+        curr_onsetst = onsets_start_adj[onidx]    # This value + 200 will be baseline lower limit.
+
+    elif "Adv" in c:
+        print(c)
+        cparts = c.split('__')
+        ik = keywords.index(cparts[0])
+        curr_stimID = stimIDs[ik].split('_')
+        onidx = onsets_stim.index(curr_stimID[0])
+        curr_onsetst = onsets_start_adv[onidx]     # This value + 200 will be baseline lower limit.
+
+
 evoked_adj = Epoch_data['Adj'].average()
 evoked_adv = Epoch_data['Adv'].average()
 
