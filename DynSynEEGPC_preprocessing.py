@@ -7,6 +7,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import json
 import pandas as pd
+import copy
 from autoreject import Ransac
 
 from meegkit import dss
@@ -270,7 +271,6 @@ eogs = mne.preprocessing.create_eog_epochs(Rawfilt_LP, ch_name=['E60','E19'], pi
 eogs.apply_baseline(baseline=(None, -0.2))
 fig_eog = eogs.plot_joint()
 data_report.add_figure(fig=fig_eog, title='Extracted EOG Artifacts')
-data_report.save(fname = report_path, overwrite=True)
 
 #%% ***************** Carry out manual detection of noisy electrodes ************************
 """The arrow keys (up/down/left/right) can typically be used to navigate between channels and time ranges, 
@@ -319,16 +319,17 @@ Rawfilt_LP.save(path2save, overwrite=True)
 
 ##%% ******************* Carry out Segmentation of the Continuous Data ************************
 """
-    Note: the maximum difference between first word in sentence and critical word is 1175ms.
-    So define tmin as ((1175+200)*-1)/1000 and tmax as 1.0s
+    Note: the maximum difference between first word in sentence and critical word for both adj and adv is 1268ms.
+    So define tmin as ((1268+200)*-1)/1000 and tmax as 1.0s
+    Then we baseline correct on an epoch-by-epoch basis based on the time of the initial word of the sentence.
 
 """
 
 currsuj_events = pd.read_excel(currevents_fullpath, sheet_name=0)
 onset_times    = pd.read_excel(onsett_fullpath, sheet_name=0)
-keywords = currsuj_events['keywords'].tolist()
-stimIDs  = currsuj_events['stimID'].tolist()
-onsets_stim = onset_times['STIM'].tolist()
+keywords       = currsuj_events['keywords'].tolist()
+stimIDs        = currsuj_events['stimID'].tolist()
+onsets_stim    = onset_times['STIM'].tolist()
 onsets_start_adj = onset_times['ADJ_START'].tolist()
 onsets_start_adv = onset_times['ADV_START'].tolist()
 
@@ -336,7 +337,7 @@ events = mne.find_events(Rawfilt_LP)
 events_from_annots = mne.events_from_annotations(Rawfilt_LP)
 events_ID = events_from_annots[1]
 
-max_dist = 1175/1000
+max_dist = 1268/1000
 tmin = (max_dist+0.2)*-1
 tmax = 1.0
 reject = {'eeg': 250e-6}
@@ -345,10 +346,7 @@ Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmi
 ## Here need to baseline correct the data...based on onset of first word in sentence.
 
 Epoch_data.plot(block=True)
-edata_adj = Epoch_data['Adj'].get_data()
-edata_adv = Epoch_data['Adv'].get_data()
-print('The shape of adjective epoched data is: {}'.format(edata_adj.shape))    # Shape is events X channel number X time
-print('The shape of adverb epoched data is: {}'.format(edata_adv.shape))
+EpochData_copy = copy.deepcopy(Epoch_data)
 events_list = Epoch_data.event_id
 conds_list  = events_list.keys()
 
@@ -360,7 +358,9 @@ for cindx, c in enumerate(conds_list):
         ik = keywords.index(cparts[0])
         curr_stimID = stimIDs[ik].split('_')
         onidx = onsets_stim.index(curr_stimID[0])
-        curr_onsetst = onsets_start_adj[onidx]    # This value + 200 will be baseline lower limit.
+        curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
+        curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+        Epoch_data[c].apply_baseline(curr_bl)
 
     elif "Adv" in c:
         print(c)
@@ -368,9 +368,13 @@ for cindx, c in enumerate(conds_list):
         ik = keywords.index(cparts[0])
         curr_stimID = stimIDs[ik].split('_')
         onidx = onsets_stim.index(curr_stimID[0])
-        curr_onsetst = onsets_start_adv[onidx]     # This value + 200 will be baseline lower limit.
+        curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
+        curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+        Epoch_data[c].apply_baseline(curr_bl)
 
+epadj_fig = EpochData_copy['Adj'].average().plot()
+epadv_fig = EpochData_copy['Adv'].average().plot()
 
-evoked_adj = Epoch_data['Adj'].average()
-evoked_adv = Epoch_data['Adv'].average()
-
+data_report.add_figure(fig=epadj_fig, title='Butterfly plot of Adj Epochs with baseline correction', caption='Remaining bad electrodes are still visible')
+data_report.add_figure(fig=epadv_fig, title='Butterfly plot of Adv Epochs with baseline correction', caption='Remaining bad electrodes are still visible')
+data_report.save(fname = report_path, overwrite=True)
