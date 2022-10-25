@@ -332,8 +332,14 @@ Rawfilt_LP.save(path2save, overwrite=True)
 currsuj_events = pd.read_excel(currevents_fullpath, sheet_name=0)
 onset_times    = pd.read_excel(onsett_fullpath, sheet_name=0)
 keywords       = currsuj_events['keywords'].tolist()
-stimIDs        = currsuj_events['stimID'].tolist()
-onsets_stim    = onset_times['STIM'].tolist()
+for ik, ikw in enumerate(keywords):
+    emtest = ' '
+    if ikw != emtest:
+        ksplit = ikw.split('/')[0]
+        keywords[ik] = ksplit
+
+stimIDs          = currsuj_events['stimID'].tolist()
+onsets_stim      = onset_times['STIM'].tolist()
 onsets_start_adj = onset_times['ADJ_START'].tolist()
 onsets_start_adv = onset_times['ADV_START'].tolist()
 
@@ -358,9 +364,12 @@ conds_list  = events_list.keys()
 for cindx, c in enumerate(conds_list):
     if "Adj" in c:
         print(c)
-        cparts = c.split('__')
+        cparts = c.split('/')
+        print(cparts)
         ik = keywords.index(cparts[0])
+        print(cparts[0])
         curr_stimID = stimIDs[ik].split('_')
+        print(curr_stimID)
         onidx = onsets_stim.index(curr_stimID[0])
         curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
         curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
@@ -368,7 +377,7 @@ for cindx, c in enumerate(conds_list):
 
     elif "Adv" in c:
         print(c)
-        cparts = c.split('__')
+        cparts = c.split('/')
         ik = keywords.index(cparts[0])
         curr_stimID = stimIDs[ik].split('_')
         onidx = onsets_stim.index(curr_stimID[0])
@@ -376,11 +385,18 @@ for cindx, c in enumerate(conds_list):
         curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
         Epoch_data[c].apply_baseline(curr_bl)
 
-epadj_fig = EpochData_copy['Adj'].average().plot()
-epadv_fig = EpochData_copy['Adv'].average().plot()
+## To calculate ERPs for the ONSET words adjectives and adverbs
+ep_onset_adj_fig = EpochData_copy['ONSET/Adj'].average().plot()
+ep_onset_adv_fig = EpochData_copy['ONSET/Adv'].average().plot()
 
-data_report.add_figure(fig=epadj_fig, title='Butterfly plot of Adj Epochs with baseline correction', caption='Remaining bad electrodes are still visible')
-data_report.add_figure(fig=epadv_fig, title='Butterfly plot of Adv Epochs with baseline correction', caption='Remaining bad electrodes are still visible')
+## To calculate the ERPs for the CW (critical word) adjectives and adverbs
+ep_CW_adj_fig = EpochData_copy['CW/Adj'].average().plot()
+ep_CW_adv_fig = EpochData_copy['CW/Adv'].average().plot()
+
+data_report.add_figure(fig=ep_onset_adj_fig, title='Butterfly plot of Adj Epochs with baseline correction for onset words', caption='Remaining bad electrodes are still visible')
+data_report.add_figure(fig=ep_onset_adv_fig, title='Butterfly plot of Adv Epochs with baseline correction for onset words', caption='Remaining bad electrodes are still visible')
+data_report.add_figure(fig=ep_CW_adv_fig, title='Butterfly plot of Adj Epochs with baseline correction for critical words', caption='Remaining bad electrodes are still visible')
+data_report.add_figure(fig=ep_CW_adv_fig, title='Butterfly plot of Adv Epochs with baseline correction for critical words', caption='Remaining bad electrodes are still visible')
 data_report.save(fname = report_path, overwrite=True)
 
 suffix = 'epo.fif'

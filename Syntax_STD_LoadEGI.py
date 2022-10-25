@@ -315,14 +315,19 @@ for si, sindx in enumerate(stim_ID):
     for mi, elem in enumerate(Mdf):
         elems = elem.split("_")
         curr_elem = elems[0]
+        print(sindx)
         if sindx == curr_elem:
             if elems[1]=='adj':
                 stimID_indices.append(mi)
                 curronset = markers_df.start[mi] + Onset_adj_list[si]/1000
                 currsamp  = curronset*sfreq
                 newtrig  = markers_df.trigger_code[mi] + 1000
-                newkeyw  = '_'.join([markers_df.keywords[mi], '_CW'])
+                newkeyw  = '/'.join([markers_df.keywords[mi], 'CW'])
                 newkeyw2 = '/'.join([newkeyw, 'Adj'])
+                newkey_onset = '/'.join([markers_df.keywords[mi], 'ONSET'])
+                newkey_onset2 = '/'.join([newkey_onset, 'Adj'])
+                markers_df.keywords[mi] = newkey_onset2
+                print(newkey_onset2)
                 print(newkeyw2)
                 M = list(markers_df.loc[mi])
                 M[2] = curronset
@@ -335,8 +340,11 @@ for si, sindx in enumerate(stim_ID):
                 curronset = markers_df.start[mi] + Onset_adj_list[si] / 1000
                 currsamp = curronset * sfreq
                 newtrig = markers_df.trigger_code[mi] + 1000
-                newkeyw = '_'.join([markers_df.keywords[mi], '_CW'])
+                newkeyw = '/'.join([markers_df.keywords[mi], 'CW'])
                 newkeyw2 = '/'.join([newkeyw, 'Adv'])
+                newkey_onset = '/'.join([markers_df.keywords[mi], 'ONSET'])
+                newkey_onset2 = '/'.join([newkey_onset, 'Adv'])
+                markers_df.keywords[mi] = newkey_onset2
                 print(newkeyw2)
                 M = list(markers_df.loc[mi])
                 M[2] = curronset
