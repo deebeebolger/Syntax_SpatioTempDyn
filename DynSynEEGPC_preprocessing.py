@@ -370,12 +370,25 @@ reject = {'eeg': 250e-6}
 
 onset_eventsID = {kw: vl for kw, vl in eventID_v2.items() if "ONSET" in kw}
 cw_eventsID = {kw: vl for kw, vl in eventID_v2.items() if "CW" in kw}
+evindx = np.where(events[:,2] >= 1000)
+cw_events = events[evindx]
 
 EpochData_ONSET = mne.Epochs(Rawfilt_LP, events=events, event_id=onset_eventsID, tmin= -0.2, tmax=tmax, baseline=(-0.2, 0), picks = chanindx,
                        reject_by_annotation=True, on_missing='raise', reject=reject, preload=True)
 EpochData_CW = mne.Epochs(Rawfilt_LP, events=events, event_id=cw_eventsID, tmin= tmin, tmax=tmax, baseline=None, picks = chanindx,
                        reject_by_annotation=True, on_missing='raise', reject=reject, preload=True)
-## Here need to baseline correct the data...based on onset of first word in sentence.
+
+#%% Save the ONSET epochs
+suffix_onset = 'onset-epo.fif'
+fsave_name_eponset = '_'.join([sujname, suffix_onset])
+path2save_eponset  = os.path.join(deriv_suj_root, fsave_name_eponset)
+EpochData_ONSET.save(path2save_eponset, overwrite=True)
+
+#%% Save the CW epochs
+suffix_cw = 'cw-epo.fif'
+fsave_name_epcw = '_'.join([sujname, suffix_onset])
+path2save_epcw  = os.path.join(deriv_suj_root, fsave_name_epcw)
+EpochData_CW.save(path2save_epcw, overwrite=True)
 
 EpochData_ONSET['Adj'].plot(block=True, events=events)
 adj_mean = EpochData_ONSET['Adj'].average()
@@ -385,80 +398,89 @@ EpochData_ONSET['Adv'].plot(block=True, events=events)
 adv_mean = EpochData_ONSET['Adv'].average()
 adv_mean.plot(spatial_colors=True)
 
-EpochData_copy = EpochData_nbl
-events_list = EpochData_copy.event_id
+## Add cw_annotations to the annotations of the
+EpochData_CW.plot(events=cw_events)
+
+
+##%% --------------------- Baseline correct the CW data --------------------------------
+events_list = EpochData_CW.event_id
 conds_list  = list(events_list.keys())
-
+EpochData_CW_bl2 = copy.deepcopy(EpochData_CW)
+#
 # baseline correct the adjective data
+epcounter = 0
 for cindx in range(0, len(conds_list)):
-    if "Adj" in conds_list[cindx]:
-        c = conds_list[cindx]
-        print(c)
-        cparts = c.split('/')
-        print(cparts)
-        ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
-        ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
-        print(stimIDs[ik[ik2[0]]])
-        curr_stimID = stimIDs[ik[ik2[0]]].split('_')
-        print(curr_stimID)
-        onidx = onsets_stim.index(curr_stimID[0])
-        if "CW" in c:
-            curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
-            curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-        elif "ONSET" in c:
-            curr_bl = (-0.2, 0)
-        EpochData_copy[c].apply_baseline(curr_bl)
+     if "Adj" in conds_list[cindx]:
+         c = conds_list[cindx]
+         print(c)
+         cparts = c.split('/')
+         print(cparts)
+         ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+         ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
+         print(stimIDs[ik[ik2[0]]])
+         if "F" in stimIDs[ik[ik2[0]]]:
+             print('Its a filler - skip \n')
+         else:
+             curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+             print(curr_stimID)
+             onidx = onsets_stim.index(curr_stimID[0])
+             curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
+             curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+             EpochData_CW_bl2[epcounter].apply_baseline(baseline=curr_bl)
+             epcounter = epcounter + 1
 
-    elif "Adv" in conds_list[cindx]:
-        c = conds_list[cindx]
-        print(c)
-        cparts = c.split('/')
-        print(cparts[0])
-        ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
-        ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
-        print(stimIDs[ik[ik2[0]]])
-        curr_stimID = stimIDs[ik[ik2[0]]].split('_')
-        print(curr_stimID)
-        onidx = onsets_stim.index(curr_stimID[0])
-        if "CW" in c:
-            curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
-            curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-        elif "ONSET" in c:
-            curr_bl  = (-0.2, 0)
-        EpochData_copy[c].apply_baseline(curr_bl)
-
-    else:
-        print("Must be the empty one!\n")
+      elif "Adv" in conds_list[cindx]:
+         c = conds_list[cindx]
+         print(c)
+         cparts = c.split('/')
+         print(cparts[0])
+         ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+         ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
+         print(stimIDs[ik[ik2[0]]])
+         if "F" in stimIDs[ik[ik2[0]]]:
+             print('Its a filler - skip\n')
+         else:
+             curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+             print(curr_stimID)
+             onidx = onsets_stim.index(curr_stimID[0])
+             curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
+             curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+             EpochData_CW_bl2[epcounter].apply_baseline(baseline=curr_bl)
+             epcounter = epcounter + 1
 
 
-## To calculate ERPs for the ONSET words adjectives and adverbs
-ep_onset_adj_fig = EpochData_copy.plot(events = events)
-ep_onset_adv_fig = EpochData_copy['ONSET/Adv'].average().plot()
+      else:
+         print("Must be the empty one!\n")
 
-## To calculate the ERPs for the CW (critical word) adjectives and adverbs
-ep_CW_adj_fig = EpochData_copy['CW/Adj'].average().plot()
-ep_CW_adv_fig = EpochData_copy['CW/Adv'].average().plot()
+EpochData_CW_bl2.baseline = (-0.2, 0)
 
-data_report.add_figure(fig=ep_onset_adj_fig, title='Butterfly plot of Adj Epochs with baseline correction for onset words', caption='Remaining bad electrodes are still visible')
-data_report.add_figure(fig=ep_onset_adv_fig, title='Butterfly plot of Adv Epochs with baseline correction for onset words', caption='Remaining bad electrodes are still visible')
-data_report.add_figure(fig=ep_CW_adv_fig, title='Butterfly plot of Adj Epochs with baseline correction for critical words', caption='Remaining bad electrodes are still visible')
-data_report.add_figure(fig=ep_CW_adv_fig, title='Butterfly plot of Adv Epochs with baseline correction for critical words', caption='Remaining bad electrodes are still visible')
-data_report.save(fname = report_path, overwrite=True)
+evindx = np.where(events[:,2] >= 1000)
+cw_events = events[evindx]
+EpochData_CW_bl2['Adj'].plot(block=True, events=cw_events)
+adjcw_mean = EpochData_CW_bl2['Adj'].average()
+adjcw_mean.plot(spatial_colors=True)
 
-suffix = 'epo.fif'
-fsave_name_ep1 = '_'.join([sujname, suffix])
-path2save_ep1  = os.path.join(deriv_suj_root, fsave_name_ep1)
-Epoch_data.save(path2save_ep1, overwrite=True)
 
-##%% ******************** Need to add functions to clean the epoched data *******************
+##%% ******************** Need to add functions to clean the Epoched data *******************
 
-epoch_picks = mne.pick_types(Epoch_data.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
-ransac_curr = Ransac(verbose=True, picks=epoch_picks, n_jobs=1)
-EpochData_clean = ransac_curr.fit_transform((EpochData_copy))
+epoch_onset_picks = mne.pick_types(EpochData_ONSET.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
+ransac_curr = Ransac(verbose=True, picks=epoch_onset_picks, n_jobs=1)
+EpochDataONSET_clean = ransac_curr.fit_transform((EpochData_ONSET))
 print('Bad channels detected by ransac are: {}'.format(ransac_curr.bad_chs_))
+adjclean_mean = EpochDataONSET_clean['Adj'].average()
+adjclean_mean.plot(spatial_colors=True)
+
+epoch_cw_picks = mne.pick_types(EpochData_CW.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
+ransac_curr2 = Ransac(verbose=True, picks=epoch_cw_picks, n_jobs=1)
+EpochDataCW_clean = ransac_curr2.fit_transform((EpochData_CW))
+print('Bad channels detected by ransac are: {}'.format(ransac_curr2.bad_chs_))
+adjclean_mean_cw = EpochDataCW_clean['Adj'].average()
+adjclean_mean_cw.plot(spatial_colors=True)
+
+
 
 ## Try plotting a heat map to show the number of bad electrodes per trial.
-ch_names = [Epoch_data.ch_names[ii] for ii in ransac_curr.picks][0::30]
+ch_names = [EpochDataONSET_clean.ch_names[ii] for ii in ransac_curr.picks][0::30]
 fig, ax = plt.subplots(1, 1, figsize=(12, 12))
 ax.imshow(ransac_curr.bad_log, cmap='Reds',
           interpolation='nearest')
@@ -471,3 +493,72 @@ plt.setp(ax.get_yticklabels(), rotation=0)
 plt.setp(ax.get_xticklabels(), rotation=90)
 ax.tick_params(axis=u'both', which=u'both', length=0)
 plt.show()
+
+
+
+#%% ----------------------------
+# EpochData_copy = EpochData_nbl
+# events_list = EpochData_copy.event_id
+# conds_list  = list(events_list.keys())
+#
+# # baseline correct the adjective data
+# for cindx in range(0, len(conds_list)):
+#     if "Adj" in conds_list[cindx]:
+#         c = conds_list[cindx]
+#         print(c)
+#         cparts = c.split('/')
+#         print(cparts)
+#         ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+#         ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
+#         print(stimIDs[ik[ik2[0]]])
+#         curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+#         print(curr_stimID)
+#         onidx = onsets_stim.index(curr_stimID[0])
+#         if "CW" in c:
+#             curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
+#             curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+#         elif "ONSET" in c:
+#             curr_bl = (-0.2, 0)
+#         EpochData_copy[c].apply_baseline(curr_bl)
+#
+#     elif "Adv" in conds_list[cindx]:
+#         c = conds_list[cindx]
+#         print(c)
+#         cparts = c.split('/')
+#         print(cparts[0])
+#         ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+#         ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
+#         print(stimIDs[ik[ik2[0]]])
+#         curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+#         print(curr_stimID)
+#         onidx = onsets_stim.index(curr_stimID[0])
+#         if "CW" in c:
+#             curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
+#             curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+#         elif "ONSET" in c:
+#             curr_bl  = (-0.2, 0)
+#         EpochData_copy[c].apply_baseline(curr_bl)
+#
+#     else:
+#         print("Must be the empty one!\n")
+#
+#
+# ## To calculate ERPs for the ONSET words adjectives and adverbs
+# ep_onset_adj_fig = EpochData_copy.plot(events = events)
+# ep_onset_adv_fig = EpochData_copy['ONSET/Adv'].average().plot()
+#
+# ## To calculate the ERPs for the CW (critical word) adjectives and adverbs
+# ep_CW_adj_fig = EpochData_copy['CW/Adj'].average().plot()
+# ep_CW_adv_fig = EpochData_copy['CW/Adv'].average().plot()
+#
+# data_report.add_figure(fig=ep_onset_adj_fig, title='Butterfly plot of Adj Epochs with baseline correction for onset words', caption='Remaining bad electrodes are still visible')
+# data_report.add_figure(fig=ep_onset_adv_fig, title='Butterfly plot of Adv Epochs with baseline correction for onset words', caption='Remaining bad electrodes are still visible')
+# data_report.add_figure(fig=ep_CW_adv_fig, title='Butterfly plot of Adj Epochs with baseline correction for critical words', caption='Remaining bad electrodes are still visible')
+# data_report.add_figure(fig=ep_CW_adv_fig, title='Butterfly plot of Adv Epochs with baseline correction for critical words', caption='Remaining bad electrodes are still visible')
+# data_report.save(fname = report_path, overwrite=True)
+#
+# suffix = 'epo.fif'
+# fsave_name_ep1 = '_'.join([sujname, suffix])
+# path2save_ep1  = os.path.join(deriv_suj_root, fsave_name_ep1)
+# Epoch.save(path2save_ep1, overwrite=True)
+#
