@@ -243,11 +243,14 @@ print('The duration of the current dataset is: {}seconds'.format(time_secs[-1]))
    Assign montage to raw object (rawIn).
 """
 montage_all = mne.channels.get_builtin_montages()
-montindx = montage_all.index('GSN-HydroCel-256')
-montage = mne.channels.make_standard_montage(montage_all[montindx])
-montage_fig = mne.viz.plot_montage(montage, show=False)  # Visualize montage.
-RawIn.set_montage(montage)  # Assign the montage to the rawIn object.
-data_report.add_figure(fig=montage_fig, title="GSN-HydroCel-257 Montage", caption= '256 channels')
+montindx = montage_all.index('GSN-HydroCel-Adult-256')
+montage = mne.channels.make_standard_montage(montage_all[montindx], head_size='auto')
+
+montage_path = os.path.join(script_exl_path, 'GSN-HydroCel-Adult-256.sfp')
+montage2     = mne.channels.read_custom_montage(montage_path, head_size=0.095)
+montage_fig  = mne.viz.plot_montage(montage2, show=False)  # Visualize montage.
+RawIn.set_montage(montage2)  # Assign the montage to the rawIn object.
+data_report.add_figure(fig=montage_fig, title="GSN-HydroCel-Adult-256 Montage", caption= '256 channels')
 
 #%% ************** Find breaks in the continuous data **********************************
 
@@ -351,7 +354,7 @@ max_dist = 1268/1000
 tmin = (max_dist+0.2)*-1
 tmax = 1.0
 reject = {'eeg': 250e-6}
-Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmin, tmax=tmax, baseline=(None, None), picks = chanindx,
+Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmin, tmax=tmax, baseline=None, picks = chanindx,
                        reject_by_annotation=False, on_missing='ignore', preload=True)
 ## Here need to baseline correct the data...based on onset of first word in sentence.
 
