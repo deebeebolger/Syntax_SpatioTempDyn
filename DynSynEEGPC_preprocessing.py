@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import json
 import pandas as pd
 import copy
+import json as json
 from autoreject import Ransac  # noqa
 from autoreject.utils import interpolate_bads
 
@@ -242,15 +243,27 @@ print('The duration of the current dataset is: {}seconds'.format(time_secs[-1]))
    Visualizing the montage in 2D.
    Assign montage to raw object (rawIn).
 """
-montage_all = mne.channels.get_builtin_montages()
-montindx = montage_all.index('GSN-HydroCel-Adult-256')
-montage = mne.channels.make_standard_montage(montage_all[montindx], head_size='auto')
-
+# montage_all = mne.channels.get_builtin_montages()
+# montindx = montage_all.index('GSN-HydroCel-Adult-256')
+# montage = mne.channels.make_standard_montage(montage_all[montindx], head_size='auto')
 montage_path = os.path.join(script_exl_path, 'GSN-HydroCel-Adult-256.sfp')
 montage2     = mne.channels.read_custom_montage(montage_path, head_size=0.095)
 montage_fig  = mne.viz.plot_montage(montage2, show=False)  # Visualize montage.
 RawIn.set_montage(montage2)  # Assign the montage to the rawIn object.
 data_report.add_figure(fig=montage_fig, title="GSN-HydroCel-Adult-256 Montage", caption= '256 channels')
+
+#%% ************************* Load in the event information from the json file. ********************
+bids_exl      = bids_suj.split('/')
+bids_exl_path = '/'.join(bids_exl[:-1])
+curr_json     = subdir+'_events_dict.json'
+currjson_path    = os.path.join(bids_exl_path, curr_json)
+
+with open(currjson_path) as user_file:
+  eventID_fromjson = json.load(user_file)
+
+eventID_v2 = {val: k for k, val in eventID_fromjson.items()}
+for keys in eventID_v2:
+    eventID_v2[keys] = int(eventID_v2[keys])
 
 #%% ************** Find breaks in the continuous data **********************************
 
@@ -286,7 +299,7 @@ data_report.add_figure(fig=fig_eog, title='Extracted EOG Artifacts')
 """
 
 Events = mne.find_events(Rawfilt_LP)
-mne.viz.plot_raw(Rawfilt_LP, events=Events, duration=20, n_channels=20, title='Select noisy channels', event_color='red',
+mne.viz.plot_raw(Rawfilt_LP, events=Events, duration=20, n_channels=30, title='Select noisy channels', event_color='red',
                      remove_dc=True, block=True, show=True)
 
 ### ********************* Detecting Bad Electrodes *********************************************
@@ -354,42 +367,72 @@ max_dist = 1268/1000
 tmin = (max_dist+0.2)*-1
 tmax = 1.0
 reject = {'eeg': 250e-6}
-Epoch_data = mne.Epochs(Rawfilt_LP, events=events, event_id=events_ID, tmin= tmin, tmax=tmax, baseline=None, picks = chanindx,
-                       reject_by_annotation=False, on_missing='ignore', preload=True)
+
+onset_eventsID = {kw: vl for kw, vl in eventID_v2.items() if "ONSET" in kw}
+cw_eventsID = {kw: vl for kw, vl in eventID_v2.items() if "CW" in kw}
+
+EpochData_ONSET = mne.Epochs(Rawfilt_LP, events=events, event_id=onset_eventsID, tmin= -0.2, tmax=tmax, baseline=(-0.2, 0), picks = chanindx,
+                       reject_by_annotation=True, on_missing='raise', reject=reject, preload=True)
+EpochData_CW = mne.Epochs(Rawfilt_LP, events=events, event_id=cw_eventsID, tmin= tmin, tmax=tmax, baseline=None, picks = chanindx,
+                       reject_by_annotation=True, on_missing='raise', reject=reject, preload=True)
 ## Here need to baseline correct the data...based on onset of first word in sentence.
 
-Epoch_data.plot(block=True)
-EpochData_copy = copy.deepcopy(Epoch_data)
-events_list = Epoch_data.event_id
-conds_list  = events_list.keys()
+EpochData_ONSET['Adj'].plot(block=True, events=events)
+adj_mean = EpochData_ONSET['Adj'].average()
+adj_mean.plot(spatial_colors=True)
+
+EpochData_ONSET['Adv'].plot(block=True, events=events)
+adv_mean = EpochData_ONSET['Adv'].average()
+adv_mean.plot(spatial_colors=True)
+
+EpochData_copy = EpochData_nbl
+events_list = EpochData_copy.event_id
+conds_list  = list(events_list.keys())
 
 # baseline correct the adjective data
-for cindx, c in enumerate(conds_list):
-    if "Adj" in c:
+for cindx in range(0, len(conds_list)):
+    if "Adj" in conds_list[cindx]:
+        c = conds_list[cindx]
         print(c)
         cparts = c.split('/')
         print(cparts)
-        ik = keywords.index(cparts[0])
-        print(cparts[0])
-        curr_stimID = stimIDs[ik].split('_')
+        ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+        ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
+        print(stimIDs[ik[ik2[0]]])
+        curr_stimID = stimIDs[ik[ik2[0]]].split('_')
         print(curr_stimID)
         onidx = onsets_stim.index(curr_stimID[0])
-        curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
-        curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-        Epoch_data[c].apply_baseline(curr_bl)
+        if "CW" in c:
+            curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
+            curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+        elif "ONSET" in c:
+            curr_bl = (-0.2, 0)
+        EpochData_copy[c].apply_baseline(curr_bl)
 
-    elif "Adv" in c:
+    elif "Adv" in conds_list[cindx]:
+        c = conds_list[cindx]
         print(c)
         cparts = c.split('/')
-        ik = keywords.index(cparts[0])
-        curr_stimID = stimIDs[ik].split('_')
+        print(cparts[0])
+        ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+        ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
+        print(stimIDs[ik[ik2[0]]])
+        curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+        print(curr_stimID)
         onidx = onsets_stim.index(curr_stimID[0])
-        curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
-        curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-        Epoch_data[c].apply_baseline(curr_bl)
+        if "CW" in c:
+            curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
+            curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+        elif "ONSET" in c:
+            curr_bl  = (-0.2, 0)
+        EpochData_copy[c].apply_baseline(curr_bl)
+
+    else:
+        print("Must be the empty one!\n")
+
 
 ## To calculate ERPs for the ONSET words adjectives and adverbs
-ep_onset_adj_fig = EpochData_copy['ONSET/Adj'].average().plot()
+ep_onset_adj_fig = EpochData_copy.plot(events = events)
 ep_onset_adv_fig = EpochData_copy['ONSET/Adv'].average().plot()
 
 ## To calculate the ERPs for the CW (critical word) adjectives and adverbs
