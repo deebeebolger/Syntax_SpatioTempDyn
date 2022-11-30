@@ -76,14 +76,14 @@ def _dolowpass(rawdata, sfreq_aim, chnoms_all, chnoms):
     chindx          = [chnoms_all.index(ic) for ic in chnoms]                                                       # Find the indices of the 'eeg' channels.
     trans_bandwidth = min(max(freq_lowpass * 0.25, 2.), sfreq_curr / 2. - freq_lowpass)                             # Find the transition bandwidth (Hz) for upper cutoff.
     filter_params   = mne.filter.create_filter(rawdata.get_data(), sfreq_curr, h_freq=freq_lowpass,
-                                               h_trans_bandwidth='trans_bandwidth', l_freq=None,
+                                               h_trans_bandwidth=trans_bandwidth, l_freq=None,
                                                fir_design='firwin', verbose=True)  # Acquire filter parameters
     lpfilt_fig      = mne.viz.plot_filter(filter_params, sfreq_curr)
     rawfilt_lp      = rawdata.copy().filter(l_freq=None, h_freq=freq_lowpass, picks=chindx, filter_length='auto',
                                        h_trans_bandwidth=trans_bandwidth, n_jobs=1, fir_design='firwin')
     return rawfilt_lp, lpfilt_fig, filter_params, decim
 
-def dobandpass(rawdata, sfreq_aim, chnoms_all, chnoms, hplimit):
+def _dobandpass(rawdata, sfreq_aim, chnoms_all, chnoms, hplimit):
 
     sfreq_curr = rawdata.info["sfreq"]
     decim      = np.round(sfreq_curr / sfreq_aim).astype(int)
@@ -94,7 +94,7 @@ def dobandpass(rawdata, sfreq_aim, chnoms_all, chnoms, hplimit):
     filter_params = mne.filter.create_filter(rawdata.get_data(), sfreq_curr, h_freq=freqhi, l_freq=freqlow,
                                              h_trans_bandwidth='auto', fir_design='firwin', verbose=True)  # Acquire filter parameters
     bpfilt_fig = mne.viz.plot_filter(filter_params, sfreq_curr)
-    rawfilt_bp = rawdata.copy().filter(l_freq = freqlow, h_freq=freqhi, picks=chindx, filter_length='auto',
+    rawfilt_bp = rawdata.copy().filter(l_freq = freqhi, h_freq=freqlow, picks=chindx, filter_length='auto',
                                        h_trans_bandwidth='auto', l_trans_bandwidth='auto', fir_design='firwin',
                                        njobs=1)
     return rawfilt_bp, bpfilt_fig, filter_params, decim
@@ -298,12 +298,12 @@ data_report.add_figure(fig=filthp_fig, title="High-pass filter characteristics")
 data_report.add_figure(fig=filtlp_fig, title="Low-pass filter characteristics")
 
 #%% ************************* Option to carry out band-pass filtering*****************************
-hplim = .03
-new_sfreq = 250
-Rawfilt_HP, filthp_fig, filthp_params, decfactor = _dohighpass(RawIn, new_sfreq, ch_names_all, ch_names, hplim)
-
-data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
-data_report.add_figure(fig=filthp_fig, title="Band-pass filter characteristics")
+# hplim = .03
+# new_sfreq = 250
+# Rawfilt_HP, filthp_fig, filthp_params, decfactor = _dobandpass(RawIn, new_sfreq, ch_names_all, ch_names, hplim)
+#
+# data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
+# data_report.add_figure(fig=filthp_fig, title="Band-pass filter characteristics")
 
 
 #%% *************** Get a summary of EOG artifacts in the data and save to the mne report. *****************************
@@ -401,6 +401,9 @@ EpochData_ONSET_bl = mne.Epochs(Rawfilt_LP, events=events, event_id=onset_events
 EpochData_CW = mne.Epochs(Rawfilt_LP, events=events, event_id=cw_eventsID, tmin= tmin, tmax=tmax, baseline=None, picks = chanindx,
                        reject_by_annotation=True, on_missing='raise', reject=reject, decim=decfactor, preload=True)
 
+EpochData_ONSET_bl.plot_drop_log()  # Plot the channel stats based on epochs dropped.
+EpochData_CW.plot_drop_log()
+
 #%% Save the ONSET epochs
 suffix_onset = 'onset-epo.fif'
 fsave_name_eponset = '_'.join([sujname, suffix_onset])
@@ -490,12 +493,14 @@ EpochData_CW_bl2 = copy.deepcopy(EpochData_CW)
 
 ##%% ******************** Need to add functions to clean the Epoched data *******************
 
-epoch_onset_picks = mne.pick_types(EpochData_ONSET.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
+epoch_onset_picks = mne.pick_types(EpochData_ONSET_bl.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
 ransac_curr = Ransac(verbose=True, picks=epoch_onset_picks, n_jobs=1)
-EpochDataONSET_clean = ransac_curr.fit_transform((EpochData_ONSET))
+EpochDataONSET_clean = ransac_curr.fit_transform((EpochData_ONSET_bl))
 print('Bad channels detected by ransac are: {}'.format(ransac_curr.bad_chs_))
 adjclean_mean = EpochDataONSET_clean['Adj'].average()
+advclean_mean = EpochDataONSET_clean['Adv'].average()
 adjclean_mean.plot(spatial_colors=True)
+advclean_mean.plot(spatial_colors=True)
 
 epoch_cw_picks = mne.pick_types(EpochData_CW.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
 ransac_curr2 = Ransac(verbose=True, picks=epoch_cw_picks, n_jobs=1)
