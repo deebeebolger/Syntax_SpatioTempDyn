@@ -83,23 +83,6 @@ def _dolowpass(rawdata, sfreq_aim, chnoms_all, chnoms):
                                        h_trans_bandwidth=trans_bandwidth, n_jobs=1, fir_design='firwin')
     return rawfilt_lp, lpfilt_fig, filter_params, decim
 
-def _dobandpass(rawdata, sfreq_aim, chnoms_all, chnoms, hplimit):
-
-    sfreq_curr = rawdata.info["sfreq"]
-    decim      = np.round(sfreq_curr / sfreq_aim).astype(int)
-    sfreq_new  = sfreq_curr / decim
-    freqlow    = sfreq_new/6
-    freqhi     = hplimit
-    chindx = [chnoms_all.index(ic) for ic in chnoms]
-    filter_params = mne.filter.create_filter(rawdata.get_data(), sfreq_curr, h_freq=freqhi, l_freq=freqlow,
-                                             h_trans_bandwidth='auto', fir_design='firwin', verbose=True)  # Acquire filter parameters
-    bpfilt_fig = mne.viz.plot_filter(filter_params, sfreq_curr)
-    rawfilt_bp = rawdata.copy().filter(l_freq = freqhi, h_freq=freqlow, picks=chindx, filter_length='auto',
-                                       h_trans_bandwidth='auto', l_trans_bandwidth='auto', fir_design='firwin',
-                                       njobs=1)
-    return rawfilt_bp, bpfilt_fig, filter_params, decim
-
-
 def findNextPowerOf2(L):
     # decrement `n` (to handle cases when `n` itself
     # is a power of 2)
@@ -162,7 +145,7 @@ study_root = study_root[1:]
 bids_root  =  os.path.join(study_root, study_name)    # BIDS root directory
 
 sessions = ['1']
-subjects = ['05']
+subjects = ['08']
 ch_types = ['eeg']
 data_type = ('eeg')
 
@@ -297,15 +280,6 @@ data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
 data_report.add_figure(fig=filthp_fig, title="High-pass filter characteristics")
 data_report.add_figure(fig=filtlp_fig, title="Low-pass filter characteristics")
 
-#%% ************************* Option to carry out band-pass filtering*****************************
-# hplim = .03
-# new_sfreq = 250
-# Rawfilt_HP, filthp_fig, filthp_params, decfactor = _dobandpass(RawIn, new_sfreq, ch_names_all, ch_names, hplim)
-#
-# data_report.add_raw (raw=RawIn, title= "Raw data", psd=False)
-# data_report.add_figure(fig=filthp_fig, title="Band-pass filter characteristics")
-
-
 #%% *************** Get a summary of EOG artifacts in the data and save to the mne report. *****************************
 eogs = mne.preprocessing.create_eog_epochs(Rawfilt_LP, ch_name=['E60','E19'], picks='eeg', reject_by_annotation=True).average()
 eogs.apply_baseline(baseline=(None, -0.2))
@@ -349,7 +323,7 @@ print('The channels pre-selected as bad are: {}'.format(badchans))
     Setting the average reference as a projector will permit the recalculation of the projector if we mark other 
     channels as "bad". 
 """
-Rawfilt_LP.set_eeg_reference('average', projection=True)    # Create the average reference as a projector.
+------------ # Create the average reference as a projector.
 
 ##%% *********************Save the filtered data with bad channels marked ********************
 suffix = 'proc-filt_raw.fif'
@@ -399,7 +373,7 @@ cw_events = events[evindx]
 EpochData_ONSET_bl = mne.Epochs(Rawfilt_LP, events=events, event_id=onset_eventsID, tmin= -0.2, tmax=tmax, baseline=(-0.2, 0), picks = chanindx,
                        reject_by_annotation=True, on_missing='raise', reject=reject, decim=decfactor,  preload=True)
 EpochData_CW = mne.Epochs(Rawfilt_LP, events=events, event_id=cw_eventsID, tmin= tmin, tmax=tmax, baseline=None, picks = chanindx,
-                       reject_by_annotation=True, on_missing='raise', reject=reject, decim=decfactor, preload=True)
+                       reject_by_annotation=True, on_missing='raise', reject=None, decim=decfactor, preload=True)
 
 EpochData_ONSET_bl.plot_drop_log()  # Plot the channel stats based on epochs dropped.
 EpochData_CW.plot_drop_log()
@@ -436,60 +410,74 @@ EpochData_CW.plot(events=cw_events)
 events_list = EpochData_CW.event_id
 conds_list  = list(events_list.keys())
 EpochData_CW_bl2 = copy.deepcopy(EpochData_CW)
+epochCW_bl = []
+ecurr      = []
+cw_baselines = []
 # Call of function to baseline correct the CW data
 
-# epcounter = 0
-# for cindx in range(0, len(conds_list)):
-#      if "Adj" in conds_list[cindx]:
-#          c = conds_list[cindx]
-#          print(c)
-#          cparts = c.split('/')
-#          print(cparts)
-#          ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
-#          ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
-#          print(stimIDs[ik[ik2[0]]])
-#          if "F" in stimIDs[ik[ik2[0]]]:
-#              print('Its a filler - skip \n')
-#          else:
-#              curr_stimID = stimIDs[ik[ik2[0]]].split('_')
-#              print(curr_stimID)
-#              onidx = onsets_stim.index(curr_stimID[0])
-#              curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
-#              curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-#              EpochData_CW_bl2[epcounter].apply_baseline(baseline=curr_bl)
-#              epcounter = epcounter + 1
-#
-#       elif "Adv" in conds_list[cindx]:
-#          c = conds_list[cindx]
-#          print(c)
-#          cparts = c.split('/')
-#          print(cparts[0])
-#          ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
-#          ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
-#          print(stimIDs[ik[ik2[0]]])
-#          if "F" in stimIDs[ik[ik2[0]]]:
-#              print('Its a filler - skip\n')
-#          else:
-#              curr_stimID = stimIDs[ik[ik2[0]]].split('_')
-#              print(curr_stimID)
-#              onidx = onsets_stim.index(curr_stimID[0])
-#              curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
-#              curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-#              EpochData_CW_bl2[epcounter].apply_baseline(baseline=curr_bl)
-#              epcounter = epcounter + 1
-#
-#
-#       else:
-#          print("Must be the empty one!\n")
-#
-# EpochData_CW_bl2.baseline = (-0.2, 0)
-#
-# evindx = np.where(events[:,2] >= 1000)
-# cw_events = events[evindx]
-# EpochData_CW_bl2['Adj'].plot(block=True, events=cw_events)
-# adjcw_mean = EpochData_CW_bl2['Adj'].average()
-# adjcw_mean.plot(spatial_colors=True)
+epcounter = 0
+for cindx in range(0, len(conds_list)):
+      if "Adj" in conds_list[cindx]:
+          c = conds_list[cindx]
+          print(c)
+          cparts = c.split('/')
+          print(cparts)
+          ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+          ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
+          print(stimIDs[ik[ik2[0]]])
+          if "F" in stimIDs[ik[ik2[0]]]:
+              print('Its a filler - skip \n')
+          else:
+              print(epcounter)
+              curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+              print(curr_stimID)
+              onidx = onsets_stim.index(curr_stimID[0])
+              curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
+              curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+              datacurr_bl = mne.baseline.rescale(EpochData_CW[epcounter].get_data(), EpochData_CW[epcounter].times, curr_bl, mode='mean')
+              epochCW_bl.append(datacurr_bl)
+              cw_baselines.append(curr_bl)
+              ecurr.append(EpochData_CW[epcounter].events)
+              epcounter = epcounter+1
 
+       elif "Adv" in conds_list[cindx]:
+          c = conds_list[cindx]
+          print(c)
+          cparts = c.split('/')
+          print(cparts[0])
+          ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
+          ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
+          print(stimIDs[ik[ik2[0]]])
+          if "F" in stimIDs[ik[ik2[0]]]:
+              print('Its a filler - skip\n')
+          else:
+              print(epcounter)
+              curr_stimID = stimIDs[ik[ik2[0]]].split('_')
+              print(curr_stimID)
+              onidx = onsets_stim.index(curr_stimID[0])
+              curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
+              curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
+              datacurr_bl = mne.baseline.rescale(EpochData_CW[epcounter].get_data(), EpochData_CW[epcounter].times, curr_bl, mode='mean')
+              epochCW_bl.append(datacurr_bl)
+              ecurr.append(EpochData_CW[epcounter].events)
+              cw_baselines.append(curr_bl)
+              epcounter = epcounter+1
+
+       else:
+          print("Must be the empty one!\n")
+
+E_CW = np.squeeze(np.asarray(epochCW_bl))
+Event_CW = np.squeeze(ecurr)
+reject_cw = {'eeg': 400e-6}
+EpochData_CW_bl2 = mne.EpochsArray(E_CW, EpochData_CW.info, events = Event_CW, tmin=tmin, event_id = cw_eventsID, reject=reject_cw, on_missing='warn', baseline=None )
+
+EpochData_CW_bl2['Adj'].plot(block=True, events=Event_CW)
+adjcw_mean = EpochData_CW_bl2['Adj'].average()
+adjcw_mean.plot(spatial_colors=True)
+
+EpochData_CW_bl2['Adv'].plot(block=True, events=Event_CW)
+adjcw_mean = EpochData_CW_bl2['Adv'].average()
+adjcw_mean.plot(spatial_colors=True)
 
 ##%% ******************** Need to add functions to clean the Epoched data *******************
 
@@ -502,12 +490,14 @@ advclean_mean = EpochDataONSET_clean['Adv'].average()
 adjclean_mean.plot(spatial_colors=True)
 advclean_mean.plot(spatial_colors=True)
 
-epoch_cw_picks = mne.pick_types(EpochData_CW.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
-ransac_curr2 = Ransac(verbose=True, picks=epoch_cw_picks, n_jobs=1)
-EpochDataCW_clean = ransac_curr2.fit_transform((EpochData_CW))
-print('Bad channels detected by ransac are: {}'.format(ransac_curr2.bad_chs_))
+epoch_cw_picks = mne.pick_types(EpochData_CW_bl2.info, meg=False, eeg=True, stim=False, include=[], exclude=[])
+ransac_curr3 = Ransac(verbose=True, picks=epoch_cw_picks, n_jobs=1)
+EpochDataCW_clean = ransac_curr3.fit_transform((EpochData_CW_bl2))
+print('Bad channels detected by ransac for CW are: {}'.format(ransac_curr3.bad_chs_))
 adjclean_mean_cw = EpochDataCW_clean['Adj'].average()
 adjclean_mean_cw.plot(spatial_colors=True)
+advclean_mean_cw = EpochDataCW_clean['Adv'].average()
+advclean_mean_cw.plot(spatial_colors=True)
 
 ## Try plotting a heat map to show the number of bad electrodes per trial.
 ch_names = [EpochDataONSET_clean.ch_names[ii] for ii in ransac_curr.picks][0::30]
@@ -524,54 +514,6 @@ plt.setp(ax.get_xticklabels(), rotation=90)
 ax.tick_params(axis=u'both', which=u'both', length=0)
 plt.show()
 
-
-
-#%% ----------------------------
-# EpochData_copy = EpochData_nbl
-# events_list = EpochData_copy.event_id
-# conds_list  = list(events_list.keys())
-#
-# # baseline correct the adjective data
-# for cindx in range(0, len(conds_list)):
-#     if "Adj" in conds_list[cindx]:
-#         c = conds_list[cindx]
-#         print(c)
-#         cparts = c.split('/')
-#         print(cparts)
-#         ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
-#         ik2 = [cntr for cntr, currval in enumerate(ik) if "adj"  in stimIDs[currval]]
-#         print(stimIDs[ik[ik2[0]]])
-#         curr_stimID = stimIDs[ik[ik2[0]]].split('_')
-#         print(curr_stimID)
-#         onidx = onsets_stim.index(curr_stimID[0])
-#         if "CW" in c:
-#             curr_onsetst = onsets_start_adj[onidx]/1000   # This value + 200 will be baseline lower limit.
-#             curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-#         elif "ONSET" in c:
-#             curr_bl = (-0.2, 0)
-#         EpochData_copy[c].apply_baseline(curr_bl)
-#
-#     elif "Adv" in conds_list[cindx]:
-#         c = conds_list[cindx]
-#         print(c)
-#         cparts = c.split('/')
-#         print(cparts[0])
-#         ik = [ikdx for ikdx, keywcurr in enumerate(keywords) if keywcurr == cparts[0]]
-#         ik2 = [cntr for cntr, currval in enumerate(ik) if "adv" in stimIDs[currval]]
-#         print(stimIDs[ik[ik2[0]]])
-#         curr_stimID = stimIDs[ik[ik2[0]]].split('_')
-#         print(curr_stimID)
-#         onidx = onsets_stim.index(curr_stimID[0])
-#         if "CW" in c:
-#             curr_onsetst = onsets_start_adv[onidx]/1000    # This value + 200 will be baseline lower limit.
-#             curr_bl = ((curr_onsetst+0.2)*-1, curr_onsetst*-1)
-#         elif "ONSET" in c:
-#             curr_bl  = (-0.2, 0)
-#         EpochData_copy[c].apply_baseline(curr_bl)
-#
-#     else:
-#         print("Must be the empty one!\n")
-#
 #
 # ## To calculate ERPs for the ONSET words adjectives and adverbs
 # ep_onset_adj_fig = EpochData_copy.plot(events = events)
